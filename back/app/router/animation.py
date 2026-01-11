@@ -48,6 +48,50 @@ class SearchPrompt(BaseModel):
 service = ManimFastAnimationService()
 template_service = TemplateService()
 
+@router.post("/api/full_generation_animation" , response_model=SuccessResponse, summary="動画生成のフルパイプライン実行")
+async def full_generation_animation(
+    concept_input: ConceptInput,
+    db: VideoDatabase = Depends(get_video_db)
+):
+    """
+    動画生成のフルパイプラインを実行する。
+    ここで発行した生成IDは基本的にSession IDとしてフロントエンドで保持する
+    """
+    try:
+        # DB に生成セッションを登録し、生成IDを取得
+        generate_id = db.generate_prompt()
+        print(f"Generated ID: {generate_id}")
+        
+        # 生成IDによって計画立案を実行と保存
+        plan_response: PlanResponse = service.plan(
+            generation_id=generate_id,
+            content=concept_input.text,
+            enhance_prompt=concept_input.additional_instructions
+        )
+        print(plan_response)
+
+        # 立案した計画をもとに動画生成を実行
+        response: SuccessResponse = service.main(
+            generation_id=generate_id,
+            content=plan_response.plan,
+            enhance_prompt=concept_input.additional_instructions,
+            max_loop=3
+        )
+
+        # 成功した場合のみDBに保存
+        if response.ok and response.video_id:
+            db.generate_video(
+                generate_id=generate_id,
+                video_id=response.video_id,
+                video_path=response.video_path,
+                prompt_path=response.prompt_path,
+                manim_code_path=response.manim_code_path
+            )
+
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Full generation error: {str(e)}")
+
 
 @router.post("/api/plan_animation", response_model=PlanResponse, summary="動画生成の計画立案")
 async def plan_animation(
@@ -105,8 +149,8 @@ async def get_animation(
     common_path = video_path / video_id / "480p15" / "GeneratedScene.mp4"
     print(common_path)
     if common_path.is_file():
-        return FileResponse(common_path, media_type="video/mp4", filename="GeneratedScene.mp4")
-
+        return FileResponse(common_path, media_type="video/mp4", filename=f"{video_id}.mp4")
+    
     return JSONResponse(status_code=404, content={"message": "Video not found"})
 
 

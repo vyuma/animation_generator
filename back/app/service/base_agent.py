@@ -73,9 +73,20 @@ class BaseManimAgent(ABC):
 
         # ローカル関数のpath関連
         self.workspace_path = Path(os.getenv("WORKSPACE_PATH"))
+        
+        self.log_path = Path(os.getenv("LOGS_PATH"))
         self.manim_scripts_path = Path(os.getenv("MANIM_SCRIPTS_PATH"))
         self.video_output_path = Path(os.getenv("VIDEO_OUTPUT_PATH"))
         self.user_instruction_path = Path(os.getenv("USER_INSTRUCTION_PATH"))
+        
+        # pathが存在しない場合には作成する
+        for path in [
+            self.log_path,
+            self.manim_scripts_path,
+            self.video_output_path,
+            self.user_instruction_path, 
+        ]:
+            path.mkdir(parents=True, exist_ok=True)
 
     def _process_edit_response(self, *, original_script: str, llm_response: str) -> str:
         """
@@ -90,9 +101,7 @@ class BaseManimAgent(ABC):
         ログのセットアップ関数
         """
         # log/ ディレクトリが存在しない場合は作成
-        if not os.path.exists("log"):
-            os.makedirs("log")
-        log_file = f"log/{logger_name}.log"
+        log_file = self.log_path / f"{logger_name}.log"
         logger.add(log_file, rotation="10 MB", retention="10 days", level="DEBUG")
         return logger.bind(name=logger_name)
 
@@ -142,9 +151,7 @@ class BaseManimAgent(ABC):
 
     def _save_script(self, video_id: str, script: str) -> Path:
         """[Helper] 共通のスクリプト保存処理"""
-        if not os.path.exists("tmp"):
-            os.makedirs("tmp")
-        tmp_path = Path(f"tmp/{video_id}.py")
+        tmp_path = self.manim_scripts_path / f"{video_id}.py"
         with open(tmp_path, "w", encoding="utf-8") as f:
             f.write(script)
 
@@ -234,6 +241,18 @@ class BaseManimAgent(ABC):
         """[Helper] manimコードのリンターチェック"""
         return self.manim_linter.check_code(code)
 
+    def _save_subprocess_logs(self, video_id: str, stdout: str, stderr: str) -> None:
+        """[Helper] subprocessのstdout/stderrをvideo_idごとにログファイルに保存"""
+        video_log_dir = self.log_path / video_id
+        video_log_dir.mkdir(parents=True, exist_ok=True)
+
+        with open(video_log_dir / "stdout.log", "w", encoding="utf-8") as f:
+            f.write(stdout or "")
+        with open(video_log_dir / "stderr.log", "w", encoding="utf-8") as f:
+            f.write(stderr or "")
+
+        self.base_logger.debug(f"Subprocess logs saved to {video_log_dir}")
+
     def _execute_script_low_res(self, script: str, video_id: str) -> str:
         """[Helper] 最低解像度での実行チェック
         副作用: video_idのファイルにスクリプトが保存される
@@ -241,15 +260,18 @@ class BaseManimAgent(ABC):
         tmp_path = self._save_script(video_id, script)
 
         try:
-            # -sで最後のフレームのみを保存、-rで解像度を大幅に下げる
-            subprocess.run(
-                ["manim", "-s", "-r", "64,36", str(tmp_path), "GeneratedScene"],
+            # dry_runオプションで実行 （実際の動画ファイルは生成しない）
+            result = subprocess.run(
+                ["manim", "--dry_run", str(tmp_path),"GeneratedScene"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 check=True,
                 encoding="utf-8",
             )
+            # stdout/stderrをログファイルに保存
+            self._save_subprocess_logs(video_id, result.stdout, result.stderr)
+
             self.base_logger.info(f"Low-res script executed successfully: {tmp_path}")
             return "Success"
         except FileNotFoundError:
@@ -257,6 +279,9 @@ class BaseManimAgent(ABC):
             return "FileNotFoundError"
 
         except subprocess.CalledProcessError as e:
+            # エラー時もstdout/stderrをログファイルに保存
+            self._save_subprocess_logs(video_id, e.stdout, e.stderr)
+
             parsed_error  = e.stderr
             # parsed_error = parse_manim_or_python_traceback(e.stderr)
             # parsed_error = format_error_for_llm(parsed_error)
@@ -272,14 +297,18 @@ class BaseManimAgent(ABC):
         tmp_path = self._save_script(video_id, script)
 
         try:
-            subprocess.run(
-                ["manim", "-ql", str(tmp_path), "GeneratedScene"], 
+            result = subprocess.run(
+                ["manim", "--silent", "-v", "error", "--quality","--progress_bar","none",
+                "--media_dir", f"{self.video_output_path}", "low", str(tmp_path), "GeneratedScene"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 check=True,
                 encoding="utf-8",
             )
+            # stdout/stderrをログファイルに保存
+            self._save_subprocess_logs(video_id, result.stdout, result.stderr)
+
             self.base_logger.info(f"Script executed successfully: {tmp_path}")
             return "Success"
         except FileNotFoundError:
@@ -287,6 +316,9 @@ class BaseManimAgent(ABC):
             return "FileNotFoundError"
 
         except subprocess.CalledProcessError as e:
+            # エラー時もstdout/stderrをログファイルに保存
+            self._save_subprocess_logs(video_id, e.stdout, e.stderr)
+
             parsed_error  = e.stderr
             # parsed_error  = parse_manim_or_python_traceback(e.stderr)
             # parsed_error =  format_error_for_llm(parsed_error)
