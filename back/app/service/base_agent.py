@@ -15,7 +15,7 @@ import uuid
 import json
 from pydantic import BaseModel
 from typing import Optional
-
+from langdetect import detect, LangDetectException
 from loguru import logger
 
 from app.tools.secure import is_code_safe
@@ -58,10 +58,11 @@ class PlanResponse(BaseModel):
 
 
 class BaseManimAgent(ABC):
-    def __init__(self, prompt_path: str = "prompt/prompts.toml"):
-        
-        
-        # ログの読み込み
+    # 対応言語リスト（新しい言語を追加する場合はここに追加）
+    SUPPORTED_LANGUAGES = ["ja", "en"]
+
+    def __init__(self, prompt_dir: str = "prompt"):
+        # Pathの設定
         self.log_path = Path(os.getenv("LOGS_PATH"))
         self.manim_scripts_path = Path(os.getenv("MANIM_SCRIPTS_PATH"))
         self.video_output_path = Path(os.getenv("VIDEO_OUTPUT_PATH"))
@@ -69,9 +70,11 @@ class BaseManimAgent(ABC):
         # ログのセットアップ
         self.base_logger = self._setup_logger(logger_name=self.__class__.__name__)
         self.diff_patcher = DiffPatcher(self.base_logger)
-
-        # プロンプトの読み込み
-        self.prompts = self._load_prompt(path=prompt_path)
+        # デフォルト言語設定
+        self.DEFAULT_LANGUAGE = os.getenv("DEFAULT_LANGUAGE")
+        # プロンプトの読み込み（多言語対応）
+        self.prompt_dir = prompt_dir
+        self.prompts = self._load_all_prompts(prompt_dir=prompt_dir)
         # LLMの初期化
         self.pro_llm = self._load_llm("gemini-3-pro-preview")
         self.flash_llm = self._load_llm("gemini-3-flash-preview")
@@ -80,15 +83,13 @@ class BaseManimAgent(ABC):
 
         # ローカル関数のpath関連
         self.workspace_path = Path(os.getenv("WORKSPACE_PATH"))
-        
-        
-        
+
         # pathが存在しない場合には作成する
         for path in [
             self.log_path,
             self.manim_scripts_path,
             self.video_output_path,
-            self.user_instruction_path, 
+            self.user_instruction_path,
         ]:
             path.mkdir(parents=True, exist_ok=True)
 
@@ -96,9 +97,7 @@ class BaseManimAgent(ABC):
         """
         Delegate to shared diff patcher utility.
         """
-        return self.diff_patcher.process_edit_response(
-            original_script=original_script, llm_response=llm_response
-        )
+        return self.diff_patcher.process_edit_response(original_script=original_script, llm_response=llm_response)
 
     def _setup_logger(self, logger_name: str):
         """
@@ -109,20 +108,124 @@ class BaseManimAgent(ABC):
         logger.add(log_file, rotation="10 MB", retention="10 days", level="DEBUG")
         return logger.bind(name=logger_name)
 
-    def _load_prompt(self, path: str):
+    def _load_all_prompts(self, prompt_dir: str) -> dict[str, dict]:
         """
-        プロンプトを指定されたパスから読み込む関数
-        prompt.tomlファイルなどのプロンプトを制御する関数は service/prompt/ 以下にまとめること。
+        全対応言語のプロンプトを読み込む関数
+
+        ディレクトリ構造:
+            prompt/
+            ├── ja/
+            │   ├── fast_ai_prompts.toml
+            │   └── prompts.toml
+            └── en/
+                ├── fast_ai_prompts.toml
+                └── prompts.toml
+
+        Returns:
+            {
+                "ja": {"chain": {...}, ...},
+                "en": {"chain": {...}, ...}
+            }
         """
-        base_dir = (
-            Path(__file__).resolve().parent
-        )  # 現在のこのファイルのディレクトリを取得する
-        prompts_path = base_dir / path
-        prompts_path = str(prompts_path)
-        with open(prompts_path, "rb") as f:
-            prompt_data = tomllib.load(f)
-        self.base_logger.info(f"Prompts loaded from {prompts_path}")
-        return prompt_data
+        base_dir = Path(__file__).resolve().parent
+        prompts_base_path = base_dir / prompt_dir
+
+        all_prompts: dict[str, dict] = {}
+
+        for lang in self.SUPPORTED_LANGUAGES:
+            lang_dir = prompts_base_path / lang
+            if not lang_dir.exists():
+                self.base_logger.warning(f"Language directory not found: {lang_dir}")
+                continue
+
+            all_prompts[lang] = {}
+            # 言語ディレクトリ内の全.tomlファイルを読み込む
+            for toml_file in lang_dir.glob("*.toml"):
+                with open(toml_file, "rb") as f:
+                    data = tomllib.load(f)
+                    # 各tomlファイルの内容をマージ
+                    for key, value in data.items():
+                        all_prompts[lang][key] = value
+
+            self.base_logger.info(f"Prompts loaded for language: {lang}")
+
+        if not all_prompts:
+            raise ValueError(f"No prompts found in {prompts_base_path}")
+
+        return all_prompts
+
+    def _detect_language(self, text: str) -> str:
+        """
+        テキストから言語を検出する
+        対応言語でない場合はデフォルト言語を返す
+        """
+        try:
+            detected = detect(text)
+            self.base_logger.debug(f"Detected language: {detected}")
+            if detected in self.SUPPORTED_LANGUAGES:
+                return detected
+            self.base_logger.debug(f"Detected '{detected}' not supported, using default")
+            return self.DEFAULT_LANGUAGE
+        except LangDetectException:
+            self.base_logger.warning("Language detection failed, using default")
+            return self.DEFAULT_LANGUAGE
+
+    def get_prompt(self, section: str, key: str, *, user_input: str) -> str:
+        """
+        ユーザー入力の言語に応じたプロンプトを取得する
+
+        エンジニアはこのメソッドを使うだけで、言語切り替えを意識する必要がない。
+
+        Args:
+            section: TOMLのセクション名 (例: "chain")
+            key: プロンプトのキー名 (例: "manim_script_generate")
+            user_input: ユーザーの入力テキスト（言語検出に使用）
+
+        Returns:
+            適切な言語のプロンプト文字列
+
+        Example:
+            prompt = self.get_prompt("chain", "manim_script_generate", user_input=content)
+        """
+        lang = self._detect_language(user_input)
+
+        # フォールバック: 指定言語になければデフォルト言語を使用
+        if lang not in self.prompts:
+            lang = self.DEFAULT_LANGUAGE
+
+        try:
+            return self.prompts[lang][section][key]
+        except KeyError:
+            # 指定言語にプロンプトがない場合、デフォルト言語で再試行
+            self.base_logger.warning(f"Prompt [{section}][{key}] not found for '{lang}', trying default")
+            return self.prompts[self.DEFAULT_LANGUAGE][section][key]
+
+    def get_prompt_by_lang(self, section: str, key: str, *, lang: str) -> str:
+        """
+        指定された言語のプロンプトを取得する
+
+        state に保存された言語を直接使う場合に使用する。
+
+        Args:
+            section: TOMLのセクション名 (例: "chain")
+            key: プロンプトのキー名 (例: "manim_script_generate")
+            lang: 言語コード (例: "ja", "en")
+
+        Returns:
+            指定言語のプロンプト文字列
+
+        Example:
+            prompt = self.get_prompt_by_lang("chain", "manim_script_generate", lang=state["detected_language"])
+        """
+        # フォールバック: 指定言語になければデフォルト言語を使用
+        if lang not in self.prompts:
+            lang = self.DEFAULT_LANGUAGE
+
+        try:
+            return self.prompts[lang][section][key]
+        except KeyError:
+            self.base_logger.warning(f"Prompt [{section}][{key}] not found for '{lang}', trying default")
+            return self.prompts[self.DEFAULT_LANGUAGE][section][key]
 
     def _load_llm(
         self, model_type: str, *, model_provider: str = "google"
@@ -133,19 +236,13 @@ class BaseManimAgent(ABC):
         """
 
         if model_provider == "google":
-            return ChatGoogleGenerativeAI(
-                model=model_type, google_api_key=os.getenv("GEMINI_API_KEY")
-            )
+            return ChatGoogleGenerativeAI(model=model_type, google_api_key=os.getenv("GEMINI_API_KEY"))
         elif model_provider == "anthropic":
             # Anthropic ClaudeのAPIキーが設定されている場合
             if os.getenv("ANTHROPIC_API_KEY"):
-                return ChatAnthropic(
-                    model=model_type, api_key=os.getenv("ANTHROPIC_API_KEY")
-                )
+                return ChatAnthropic(model=model_type, api_key=os.getenv("ANTHROPIC_API_KEY"))
         elif model_provider == "openai":
-            return ChatOpenAI(
-                model_name=model_type, api_key=os.getenv("OPENAI_API_KEY")
-            )
+            return ChatOpenAI(model_name=model_type, api_key=os.getenv("OPENAI_API_KEY"))
         else:
             raise ValueError("Unsupported model provider")
 
@@ -162,9 +259,7 @@ class BaseManimAgent(ABC):
         self.base_logger.info(f"Script saved to {tmp_path}")
         return tmp_path
 
-    def _save_prompt(
-        self, generation_id: str, content: str, enhance_prompt: str = ""
-    ) -> str:
+    def _save_prompt(self, generation_id: str, content: str, enhance_prompt: str = "") -> str:
         """[Helper] 共通のプロンプト保存処理"""
 
         prompt_dir = self.user_instruction_path
@@ -266,7 +361,7 @@ class BaseManimAgent(ABC):
         try:
             # dry_runオプションで実行 （実際の動画ファイルは生成しない）
             result = subprocess.run(
-                ["manim", "--dry_run", str(tmp_path),"GeneratedScene"],
+                ["manim", "--dry_run", str(tmp_path), "GeneratedScene"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -286,13 +381,13 @@ class BaseManimAgent(ABC):
             # エラー時もstdout/stderrをログファイルに保存
             self._save_subprocess_logs(video_id, e.stdout, e.stderr)
 
-            parsed_error  = e.stderr
+            parsed_error = e.stderr
             # parsed_error = parse_manim_or_python_traceback(e.stderr)
             # parsed_error = format_error_for_llm(parsed_error)
             self.base_logger.error(f"Low-res execution failed: {parsed_error}")
             return parsed_error
-    
-    def _execute_script(self,script:str,video_id:str) -> str:
+
+    def _execute_script(self, script: str, video_id: str) -> str:
         """[Helper] manimスクリプトの実行
         副作用: video_idのファイルにスクリプトが保存される
 
@@ -302,9 +397,20 @@ class BaseManimAgent(ABC):
 
         try:
             result = subprocess.run(
-                ["manim", "--silent", "-v", "error", "--progress_bar","none",
-                "--media_dir", f"{self.video_output_path}","--quality", "l", 
-                str(script_path), "GeneratedScene"],
+                [
+                    "manim",
+                    "--silent",
+                    "-v",
+                    "error",
+                    "--progress_bar",
+                    "none",
+                    "--media_dir",
+                    f"{self.video_output_path}",
+                    "--quality",
+                    "l",
+                    str(script_path),
+                    "GeneratedScene",
+                ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -324,7 +430,7 @@ class BaseManimAgent(ABC):
             # エラー時もstdout/stderrをログファイルに保存
             self._save_subprocess_logs(video_id, e.stdout, e.stderr)
 
-            parsed_error  = e.stderr
+            parsed_error = e.stderr
             # parsed_error  = parse_manim_or_python_traceback(e.stderr)
             # parsed_error =  format_error_for_llm(parsed_error)
             self.base_logger.error(f"Script execution failed: {parsed_error}")
@@ -351,7 +457,7 @@ class BaseManimAgent(ABC):
         pass
 
     @abstractmethod
-    def generate_video(self,video_id:str,content:str,enhance_prompt:str,maxloop:int=3)->str:
+    def generate_video(self, video_id: str, content: str, enhance_prompt: str, maxloop: int = 3) -> str:
         """
         サブクラスで実装されるべき抽象的なメソッド
 
@@ -360,7 +466,7 @@ class BaseManimAgent(ABC):
         video_id: 動画の一意な識別子
         content: manimコード生成のための計画立案（planであることに注意する）
         enhance_prompt:動画作成をするための追加プロンプト
-        
+
         を受け取る。
 
         return:
@@ -373,9 +479,7 @@ class BaseManimAgent(ABC):
         pass
 
     @abstractmethod
-    def edit_video(
-        self, new_video_id: str, script: str, enhance_prompt: str, max_loop: int = 3
-    ) -> str:
+    def edit_video(self, new_video_id: str, script: str, enhance_prompt: str, max_loop: int = 3) -> str:
         """
         サブクラスで実装されるべき抽象的なメソッド
 
@@ -412,9 +516,7 @@ class BaseManimAgent(ABC):
             self.base_logger.error(f"Error in plan: {e}")
             return PlanResponse(plan="", generation_id=None)
 
-    def main(
-        self, generation_id, content: str, enhance_prompt: str, max_loop: int = 3
-    ) -> SuccessResponse:
+    def main(self, generation_id, content: str, enhance_prompt: str, max_loop: int = 3) -> SuccessResponse:
         """
         動画生成のメイン関数
         """

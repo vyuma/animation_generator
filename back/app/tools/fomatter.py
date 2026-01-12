@@ -1,9 +1,7 @@
 import re, ast, html
 
-CODEBLOCK_RE = re.compile(
-    r"```(?:\s*python)?\s*\n(.*?)```",
-    re.DOTALL | re.IGNORECASE
-)
+CODEBLOCK_RE = re.compile(r"```(?:\s*python)?\s*\n(.*?)```", re.DOTALL | re.IGNORECASE)
+
 
 def sanitize_python_code(raw: str) -> str:
     """

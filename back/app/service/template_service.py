@@ -60,14 +60,7 @@ class TemplateService:
                     "後から類似検索しやすいように数学用語を含めてください。"
                 )
             ),
-            HumanMessage(
-                content=(
-                    "次のManimコードを要約してください。\n"
-                    "```python\n"
-                    f"{manim_code}\n"
-                    "```\n"
-                )
-            ),
+            HumanMessage(content=(f"次のManimコードを要約してください。\n```python\n{manim_code}\n```\n")),
         ]
         response = llm.invoke(messages)
         summary = self._extract_llm_text(response)
@@ -92,9 +85,7 @@ class TemplateService:
             normalized_summary = summary_text.strip()
             if not normalized_summary:
                 raise ValueError("summary must not be empty.")
-            is_success = self._rag_store.add_summary(
-                video_id=video_id, summary=normalized_summary
-            )
+            is_success = self._rag_store.add_summary(video_id=video_id, summary=normalized_summary)
             return is_success
         except Exception as e:
             raise ValueError(f"Failed to add summary to RAG store: {e}")

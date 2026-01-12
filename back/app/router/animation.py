@@ -2,14 +2,14 @@ from pathlib import Path
 
 import os
 from dotenv import load_dotenv
-from fastapi import APIRouter, HTTPException ,Depends
-from fastapi.responses import FileResponse, JSONResponse 
+from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 
 
 from app.service.fast_ai_agent import ManimFastAnimationService
-from app.service.base_agent import SuccessResponse , PlanResponse
+from app.service.base_agent import SuccessResponse, PlanResponse
 from app.model.model import VideoDatabase, get_video_db
 from app.service.template_service import TemplateService
 
@@ -19,7 +19,7 @@ router = APIRouter(tags=["animation"])
 
 
 script_path = Path(os.getenv("MANIM_SCRIPTS_PATH"))
-video_path = Path(os.getenv("VIDEO_OUTPUT_PATH")) 
+video_path = Path(os.getenv("VIDEO_OUTPUT_PATH"))
 
 
 # ---------- Pydantic Models ----------
@@ -27,32 +27,36 @@ class ConceptInput(BaseModel):
     text: str
     additional_instructions: Optional[str] = ""
 
+
 class Output(BaseModel):
     output: str
 
+
 class InitialPrompt(BaseModel):
-    generation_id:int
-    content: str # manim planで作成したプロンプト
+    generation_id: int
+    content: str  # manim planで作成したプロンプト
     enhance_prompt: str = ""
+
 
 class EditPrompt(BaseModel):
     generation_id: int
     prior_video_id: str
     enhance_prompt: str
 
+
 class SearchPrompt(BaseModel):
     content: str
-    
+
 
 # ---------- Service ----------
 # service = ManimGraphAnimationService()
 service = ManimFastAnimationService()
 template_service = TemplateService()
 
-@router.post("/api/full_generation_animation" , response_model=SuccessResponse, summary="動画生成のフルパイプライン実行")
+
+@router.post("/api/full_generation_animation", response_model=SuccessResponse, summary="動画生成のフルパイプライン実行")
 async def full_generation_animation(
-    concept_input: ConceptInput,
-    db: VideoDatabase = Depends(get_video_db)
+    concept_input: ConceptInput, db: VideoDatabase = Depends(get_video_db)
 ) -> SuccessResponse:
     """
     動画生成のフルパイプラインを実行する。
@@ -62,12 +66,10 @@ async def full_generation_animation(
         # DB に生成セッションを登録し、生成IDを取得
         generate_id = db.generate_prompt()
         print(f"Generated ID: {generate_id}")
-        
+
         # 生成IDによって計画立案を実行と保存
         plan_response: PlanResponse = service.plan(
-            generation_id=generate_id,
-            content=concept_input.text,
-            enhance_prompt=concept_input.additional_instructions
+            generation_id=generate_id, content=concept_input.text, enhance_prompt=concept_input.additional_instructions
         )
         print(plan_response)
 
@@ -76,7 +78,7 @@ async def full_generation_animation(
             generation_id=generate_id,
             content=plan_response.plan,
             enhance_prompt=concept_input.additional_instructions,
-            max_loop=3
+            max_loop=3,
         )
 
         # 成功した場合のみDBに保存
@@ -86,7 +88,7 @@ async def full_generation_animation(
                 video_id=response.video_id,
                 video_path=response.video_path,
                 prompt_path=response.prompt_path,
-                manim_code_path=response.manim_code_path
+                manim_code_path=response.manim_code_path,
             )
 
         return response
@@ -95,10 +97,7 @@ async def full_generation_animation(
 
 
 @router.post("/api/plan_animation", response_model=PlanResponse, summary="動画生成の計画立案")
-async def plan_animation(
-    concept_input: ConceptInput,
-    db: VideoDatabase = Depends(get_video_db)
-):
+async def plan_animation(concept_input: ConceptInput, db: VideoDatabase = Depends(get_video_db)):
     """
     動画生成の計画立案を行う。
     ここで発行した生成IDは基本的にSession IDとしてフロントエンドで保持する
@@ -107,13 +106,10 @@ async def plan_animation(
         # DB に生成セッションを登録し、生成IDを取得
         generate_id = db.generate_prompt()
         print(f"Generated ID: {generate_id}")
-        
-        
+
         # 生成IDによって計画立案を実行と保存
         plan_response: PlanResponse = service.plan(
-            generation_id=generate_id,
-            content=concept_input.text,
-            enhance_prompt=concept_input.additional_instructions
+            generation_id=generate_id, content=concept_input.text, enhance_prompt=concept_input.additional_instructions
         )
         print(plan_response)
         return plan_response
@@ -122,9 +118,7 @@ async def plan_animation(
 
 
 @router.post("/api/dev/reset_database", summary="【開発用】データベースの完全リセット")
-async def dev_reset_database(
-    db: VideoDatabase = Depends(get_video_db)
-):
+async def dev_reset_database(db: VideoDatabase = Depends(get_video_db)):
     """
     【危険な操作】データベースのすべてのテーブルを削除し、
     現在のモデル定義に基づいて再作成します。
@@ -141,25 +135,22 @@ async def dev_reset_database(
 @router.get("/api/animation/{video_id}", summary="生成済み動画の取得")
 async def get_animation(
     video_id: str,
-    ):
+):
     """
     生成済みの動画ファイル（mp4）を返す。
     最終 mp4 が確定パスにない場合でも、サブディレクトリを走査して最新の mp4 を返す。
     """
     # まずは一般的な完成パスを優先的に見る
-    common_path = video_path / "videos" / video_id /"480p15" / "GeneratedScene.mp4"
+    common_path = video_path / "videos" / video_id / "480p15" / "GeneratedScene.mp4"
     print(common_path)
     if common_path.is_file():
         return FileResponse(common_path, media_type="video/mp4", filename=f"{video_id}.mp4")
-    
+
     return JSONResponse(status_code=404, content={"message": "Video not found"})
 
 
 @router.get("/api/animation/get_info/{video_id}", summary="生成済み動画のメタ情報取得")
-async def get_animation_info(
-        video_id: str,
-        db: VideoDatabase = Depends(get_video_db)
-    ):
+async def get_animation_info(video_id: str, db: VideoDatabase = Depends(get_video_db)):
     """
     生成済み動画のオブジェクトにある情報を取得する。
     """
@@ -170,10 +161,7 @@ async def get_animation_info(
 
 
 @router.post("/api/register_rag/{video_id}", summary="RAG用動画登録API")
-async def register_rag_video(
-    video_id: str,
-    db: VideoDatabase = Depends(get_video_db)
-    ):
+async def register_rag_video(video_id: str, db: VideoDatabase = Depends(get_video_db)):
     """
     テンプレート動画を探すRAG用に動画を登録する
     1. manim_codeの内容をgemini2.5-flash-liteで要約する
@@ -210,9 +198,7 @@ async def register_rag_video(
 
 
 @router.post("/api/search_animation", summary="RAG用動画検索API")
-async def search_animation(
-    search_prompt: SearchPrompt
-):
+async def search_animation(search_prompt: SearchPrompt):
     """
     content(ユーザーが入力した検索内容)と類似度が高いvideo_idと説明文をリスト形式で返す
     例:
@@ -240,16 +226,13 @@ async def search_animation(
 
 
 @router.post("/api/animation")
-async def generate_regacy_animation(
-    initial_prompt:InitialPrompt,
-    db: VideoDatabase = Depends(get_video_db)
-    ):
+async def generate_regacy_animation(initial_prompt: InitialPrompt, db: VideoDatabase = Depends(get_video_db)):
     try:
         response: SuccessResponse = service.main(
             generation_id=initial_prompt.generation_id,
             content=initial_prompt.content,
             enhance_prompt=initial_prompt.enhance_prompt,
-            max_loop=3
+            max_loop=3,
         )
 
         # 成功した場合のみDBに保存
@@ -259,20 +242,17 @@ async def generate_regacy_animation(
                 video_id=response.video_id,
                 video_path=response.video_path,
                 prompt_path=response.prompt_path,
-                manim_code_path=response.manim_code_path
+                manim_code_path=response.manim_code_path,
             )
 
         return response
     except Exception as e:
         # サービス内例外は 500 で返却
         raise HTTPException(status_code=500, detail=str(e))
-    
+
 
 @router.post("/api/animation/edit", response_model=SuccessResponse, summary="動画編集API")
-async def edit_video(
-    edit_prompt: EditPrompt,
-    db: VideoDatabase = Depends(get_video_db)
-):
+async def edit_video(edit_prompt: EditPrompt, db: VideoDatabase = Depends(get_video_db)):
     try:
         response: SuccessResponse = service.edit(
             generation_id=edit_prompt.generation_id,

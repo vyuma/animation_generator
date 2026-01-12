@@ -1,6 +1,7 @@
 from manim import *
 import numpy as np
 
+
 class GeneratedScene(Scene):
     def construct(self):
         # ===== 軸と放物線の設計 =====
@@ -15,8 +16,8 @@ class GeneratedScene(Scene):
         title = Text("二次関数：判別式 D と x 軸との交点").scale(0.62)
 
         formula = MathTex("y=ax^2+bx+c\\quad (a\\ne 0)").scale(0.9)
-        disc    = MathTex("D=b^2-4ac").scale(0.9)
-        quad    = MathTex("x=\\frac{-b\\pm\\sqrt{D}}{2a}").scale(0.9)
+        disc = MathTex("D=b^2-4ac").scale(0.9)
+        quad = MathTex("x=\\frac{-b\\pm\\sqrt{D}}{2a}").scale(0.9)
         left_formula_grp = VGroup(formula, disc, quad).arrange(DOWN, aligned_edge=LEFT, buff=0.16)
 
         # a,b は固定表示、c は可変表示（D の上に配置）
@@ -35,14 +36,12 @@ class GeneratedScene(Scene):
         D_label = VGroup(MathTex("D\\;=").scale(0.9), D_num).arrange(RIGHT, buff=0.08)
 
         # 説明（ケース表示）は一番下に配置（のちほど右グラフの下端と揃える）
-        case_box  = RoundedRectangle(corner_radius=0.15, width=5.4, height=0.9, color=WHITE).set_fill(opacity=0.08)
+        case_box = RoundedRectangle(corner_radius=0.15, width=5.4, height=0.9, color=WHITE).set_fill(opacity=0.08)
         case_text = Text("D < 0  →  交点なし").scale(0.56).set_color(RED).move_to(case_box.get_center())
         case_panel = VGroup(case_box, case_text)
 
         # 左カラムの「上側説明」だけをまとめる（重なり防止のためケースは別グループ）
-        left_top = VGroup(title, left_formula_grp, param_row, D_label).arrange(
-            DOWN, aligned_edge=LEFT, buff=0.22
-        )
+        left_top = VGroup(title, left_formula_grp, param_row, D_label).arrange(DOWN, aligned_edge=LEFT, buff=0.22)
 
         # ===== 右カラム（座標軸と放物線） =====
         axes = Axes(
@@ -59,31 +58,35 @@ class GeneratedScene(Scene):
 
         def f(x):
             c = c_tracker.get_value()
-            return a*x*x + b*x + c
+            return a * x * x + b * x + c
 
         graph = always_redraw(lambda: axes.plot(lambda x: f(x), x_range=[X_MIN, X_MAX], color=YELLOW))
 
         # 交点の可視化（D の符号で 0/1/2 個、範囲外は非表示）
         def roots_group():
             c = c_tracker.get_value()
-            D = b*b - 4*a*c
+            D = b * b - 4 * a * c
             g = VGroup()
             if D > eps:
                 r = np.sqrt(D)
-                x1 = (-b - r) / (2*a)
-                x2 = (-b + r) / (2*a)
+                x1 = (-b - r) / (2 * a)
+                x2 = (-b + r) / (2 * a)
                 if X_MIN <= x1 <= X_MAX:
                     d1 = Dot(axes.c2p(x1, 0), color=GREEN).scale(0.8)
-                    l1 = DashedLine(axes.c2p(x1, 0), axes.c2p(x1, f(x1)), color=GREEN, dash_length=0.12, dashed_ratio=0.6)
+                    l1 = DashedLine(
+                        axes.c2p(x1, 0), axes.c2p(x1, f(x1)), color=GREEN, dash_length=0.12, dashed_ratio=0.6
+                    )
                     x1_label = MathTex("x_1").scale(0.72).next_to(d1, DOWN, buff=0.06)
                     g.add(l1, d1, x1_label)
                 if X_MIN <= x2 <= X_MAX:
                     d2 = Dot(axes.c2p(x2, 0), color=GREEN).scale(0.8)
-                    l2 = DashedLine(axes.c2p(x2, 0), axes.c2p(x2, f(x2)), color=GREEN, dash_length=0.12, dashed_ratio=0.6)
+                    l2 = DashedLine(
+                        axes.c2p(x2, 0), axes.c2p(x2, f(x2)), color=GREEN, dash_length=0.12, dashed_ratio=0.6
+                    )
                     x2_label = MathTex("x_2").scale(0.72).next_to(d2, DOWN, buff=0.06)
                     g.add(l2, d2, x2_label)
             elif abs(D) <= eps:
-                x0 = -b / (2*a)
+                x0 = -b / (2 * a)
                 if X_MIN <= x0 <= X_MAX:
                     d0 = Dot(axes.c2p(x0, 0), color=ORANGE).scale(0.9)
                     x0_label = MathTex("x_0").scale(0.72).next_to(d0, DOWN, buff=0.06)
@@ -110,7 +113,7 @@ class GeneratedScene(Scene):
         layout = VGroup(left_col, right_col).arrange(RIGHT, buff=column_gap, aligned_edge=DOWN)
 
         # 画面内に収まるように最終フィット（上下・左右ともに）
-        max_w = config.frame_width  - 2 * margin_x
+        max_w = config.frame_width - 2 * margin_x
         max_h = config.frame_height - 2 * margin_y
         scale_all = min(max_w / layout.width, max_h / layout.height, 1.0)
         layout.scale(scale_all)
@@ -119,7 +122,7 @@ class GeneratedScene(Scene):
         # ===== Updaters（c と D を同時更新）=====
         def update_D_and_c(_m=None):
             c = c_tracker.get_value()
-            D = b*b - 4*a*c
+            D = b * b - 4 * a * c
             c_num.set_value(c)
             D_num.set_value(D)
             if D > eps:

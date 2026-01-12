@@ -31,18 +31,10 @@ class TemplateRAGStore:
         self.template_dir = base_dir / "template_code_with_video"
         self.seed_marker = self.persist_dir / ".templates_seeded"
 
-        workspace_root = Path(
-            os.getenv("WORKSPACE_PATH", str(base_dir.parent.parent.parent))
-        )
-        self.scripts_dir = Path(
-            os.getenv("MANIM_SCRIPTS_PATH", str(workspace_root / "tmp"))
-        )
-        self.videos_dir = Path(
-            os.getenv("VIDEO_OUTPUT_PATH", str(workspace_root / "media" / "videos"))
-        )
-        self.prompts_dir = Path(
-            os.getenv("USER_INSTRUCTION_PATH", str(workspace_root / "prompts"))
-        )
+        workspace_root = Path(os.getenv("WORKSPACE_PATH", str(base_dir.parent.parent.parent)))
+        self.scripts_dir = Path(os.getenv("MANIM_SCRIPTS_PATH", str(workspace_root / "tmp")))
+        self.videos_dir = Path(os.getenv("VIDEO_OUTPUT_PATH", str(workspace_root / "media" / "videos")))
+        self.prompts_dir = Path(os.getenv("USER_INSTRUCTION_PATH", str(workspace_root / "prompts")))
 
         self.scripts_dir.mkdir(parents=True, exist_ok=True)
         self.videos_dir.mkdir(parents=True, exist_ok=True)
@@ -106,9 +98,7 @@ class TemplateRAGStore:
             return []
 
         try:
-            doc_scores = self._vector_store.similarity_search_with_relevance_scores(
-                query, k=max_gets
-            )
+            doc_scores = self._vector_store.similarity_search_with_relevance_scores(query, k=max_gets)
         except ValueError:
             # 空DBのときなど
             return []
@@ -119,7 +109,7 @@ class TemplateRAGStore:
                 {
                     "video_id": doc.metadata.get("video_id"),
                     "content": doc.page_content,
-                    "score": float(score), # scoreは[-1,1]の範囲のfloat
+                    "score": float(score),  # scoreは[-1,1]の範囲のfloat
                 }
             )
         return out
@@ -184,6 +174,7 @@ class TemplateRAGStore:
 
         if seeded:
             self.seed_marker.write_text(datetime.utcnow().isoformat())
+
     def _collect_template_pairs(self) -> List[Dict[str, Any]]:
         """
         template_code_with_video ディレクトリから (.py, .mp4) のペアを抽出する。
@@ -253,9 +244,8 @@ class TemplateRAGStore:
             except json.JSONDecodeError:
                 return {}
         return {}
-    def _build_summary_from_script(
-        self, *, video_id: str, template_name: str, script_text: str
-    ) -> str:
+
+    def _build_summary_from_script(self, *, video_id: str, template_name: str, script_text: str) -> str:
         """
         template_summary_cache.json にある要約をそのまま返す。
         """
@@ -265,6 +255,5 @@ class TemplateRAGStore:
             if summary:
                 return summary
         raise KeyError(
-            f"Summary for template {template_name} is missing. "
-            "Please ensure template_summary_cache.json is up to date."
+            f"Summary for template {template_name} is missing. Please ensure template_summary_cache.json is up to date."
         )

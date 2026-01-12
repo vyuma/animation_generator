@@ -1,0 +1,82 @@
+["chain"]
+manim_script_generate = """
+You are an expert in Manim code generation.
+Based on the following instructions, output Python code executable in Manim.
+Do not write any unnecessary explanations other than the code.
+The Manim version is 0.19.0. Only manim and numpy are installed in the Python execution environment.
+Do not use other libraries.
+Using default numpy functions or variable names directly is dangerous.
+When writing LaTeX code, use r" (raw strings). Example: r"\\frac{{a}}{{b}}"
+Make sure to use `from manim import *` and `class GeneratedScene(Scene):` to create the scene.
+
+Prohibitions (Strictly Observed)
+- Never use Tex.
+- Do not include non-ASCII characters (Japanese, full-width symbols, etc.) inside MathTex.
+- Do not use \\text inside MathTex (even ASCII is not allowed).
+- Only use colors BLACK, WHITE, RED, GREEN, BLUE, YELLOW, ORANGE, PURPLE, PINK, TEAL.
+
+Instructions:
+{instructions}
+
+Output format:
+```python
+from manim import *
+class GeneratedScene(Scene):
+    def construct(self):
+        # ...
+        self.camera.background_color = BLACK
+        # ...
+```
+"
+
+
+manim_planer_with_instruct = """
+You are a production planner for Manim 0.19.0. Based on the following user prompt, generate minimal instructions for creating the scene, describing what animations or shapes should be created in Manim.
+
+User Prompt: {user_prompt}
+
+Output Format:
+- Shapes and text to be drawn in Manim (including color and size specifications)
+- How to move the shapes and text (animation instructions)
+- Flow of the entire scene
+- Notes to ensure the scene is easy to view
+- Please generate the text in English.
+
+Notes from user:
+{video_enhance_prompt}
+"
+
+
+fast_ai_refine_patch = """
+You are a professional Manim 0.19.0 developer.
+1. Error content: {lint_summary}
+2. Failed script: {original_script}
+Task:
+Fix all errors pointed out in the above diagnosis.
+Output only the Unified Diff (unidiff) within a diff-fenced code block. Do not write explanations or the full completed code.
+
+Strict Output Format Requirements:
+```unidiff
+*** Begin Patch
+*** Update File: script.py
+@@ -<start_line>,<deleted_lines> +<start_line>,<added_lines> @@
+ Existing lines with at least 3 lines of context before and after (starting with a space)
+-Line to be deleted (starting with -)
++Line to be added (starting with +)
+*** End Patch
+```
+- Each hunk must include at least 3 lines of context (lines starting with ` `) before and after the change.
+- The `@@` line must include the start line number and line count.
+- Do not output anything other than the diff-fenced code block including `*** Begin Patch` and `*** End Patch`.
+"
+
+fast_ai_edit_initial = """
+You are a professional Manim 0.19.0 developer.
+Update the existing Manim script ({original_script}) based on the following edit instructions ({edit_instructions}).
+
+Requirements:
+1. Reflect all edit instructions while maintaining the animation's intent.
+2. Output only the Unified Diff (unidiff) within a diff-fenced code block; do not include explanations or the full completed code.
+3. Each hunk must include at least 3 lines of context before and after the change, using the `@@ -<start_line>,<deleted_lines> +<start_line>,<added_lines> @@` format hunk header.
+4. Do not output anything other than the diff-fenced code block including `*** Begin Patch` and `*** End Patch`.
+""

@@ -3,7 +3,10 @@ from typing import Dict, Optional, Tuple
 
 SITE_PKGS_MARKER = "/site-packages/"
 
-def _pick_best_frame(frames: list[Tuple[str, int, Optional[str]]]) -> Tuple[Optional[str], Optional[int], Optional[str]]:
+
+def _pick_best_frame(
+    frames: list[Tuple[str, int, Optional[str]]],
+) -> Tuple[Optional[str], Optional[int], Optional[str]]:
     """Prefer the last frame not in site-packages; otherwise use the last frame."""
     if not frames:
         return None, None, None
@@ -11,6 +14,7 @@ def _pick_best_frame(frames: list[Tuple[str, int, Optional[str]]]) -> Tuple[Opti
         if path and SITE_PKGS_MARKER not in path:
             return path, line, func
     return frames[-1]
+
 
 def _extract_code_from_rich_block(tb_text: str, target_line: int) -> Optional[str]:
     """
@@ -37,6 +41,7 @@ def _extract_code_from_rich_block(tb_text: str, target_line: int) -> Optional[st
             candidate = m.group("rest")
     return candidate
 
+
 def _extract_code_after_frame_line(tb_text: str, frame_path: str, target_line: int) -> Optional[str]:
     """
     Fallback: from the frame line '/path/file.py:13 in ...', pick the next
@@ -57,6 +62,7 @@ def _extract_code_after_frame_line(tb_text: str, frame_path: str, target_line: i
                     return s
     return None
 
+
 def _read_code_from_file(path: str, target_line: int) -> Optional[str]:
     """Final fallback: read the source file directly."""
     try:
@@ -67,6 +73,7 @@ def _read_code_from_file(path: str, target_line: int) -> Optional[str]:
     except Exception:
         return None
     return None
+
 
 def parse_manim_or_python_traceback(tb_text: str) -> Dict[str, Optional[str]]:
     """
@@ -133,9 +140,11 @@ def parse_manim_or_python_traceback(tb_text: str) -> Dict[str, Optional[str]]:
     # Code snippet: try (1) rich line, (2) next line after frame, (3) read file
     code = None
     if isinstance(best_line, int):
-        code = _extract_code_from_rich_block(text, best_line) or (
-            best_path and _extract_code_after_frame_line(text, best_path, best_line)
-        ) or (best_path and _read_code_from_file(best_path, best_line))
+        code = (
+            _extract_code_from_rich_block(text, best_line)
+            or (best_path and _extract_code_after_frame_line(text, best_path, best_line))
+            or (best_path and _read_code_from_file(best_path, best_line))
+        )
 
     return {
         "file": best_path,
@@ -145,6 +154,7 @@ def parse_manim_or_python_traceback(tb_text: str) -> Dict[str, Optional[str]]:
         "message": message,
         "code": code,
     }
+
 
 def format_error_for_llm(err: Dict[str, Optional[str]]) -> str:
     """
@@ -158,6 +168,7 @@ def format_error_for_llm(err: Dict[str, Optional[str]]) -> str:
         f"message: {err.get('message')}\n"
         f"code: {err.get('code')}\n"
     )
+
 
 # ------- Example -------
 if __name__ == "__main__":

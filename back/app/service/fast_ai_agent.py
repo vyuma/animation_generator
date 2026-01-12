@@ -33,19 +33,28 @@ class ManimGraphState(TypedDict):
 
 
 class ManimFastAnimationService(BaseManimAgent):
-    def __init__(self, prompt_path="prompt/fast_ai_prompts.toml"):
-        super().__init__(prompt_path)
+    def __init__(self, prompt_dir: str = "prompt"):
+        super().__init__(prompt_dir)
+        self._current_language: str = self.DEFAULT_LANGUAGE
         # --- LangGraph のグラフを構築 ---
         self.workflow = self._build_graph()
         self.app = self.workflow.compile()
 
-    def generate_script_with_prompt(self, animation_plan: str) -> str:
+    def _get_prompt(self, section: str, key: str) -> str:
+        """
+        現在の言語設定でプロンプトを取得する
+        エンジニアはこれを使うだけでOK
+        """
+        return self.get_prompt_by_lang(section, key, lang=self._current_language)
+
+    def _generate_script_with_prompt(self, animation_plan: str) -> str:
         """
         生成済みのアニメーションプランから Manim スクリプトを生成する関数
         """
+        prompt_template = self._get_prompt("chain", "manim_script_generate")
         manim_script_prompt = PromptTemplate(
             input_variables=["instructions"],
-            template=self.prompts["chain"]["manim_script_generate"],
+            template=prompt_template,
         )
         parser = StrOutputParser()
 
@@ -61,7 +70,8 @@ class ManimFastAnimationService(BaseManimAgent):
 
     def _generate_initial_script_edit(self, state: ManimGraphState):
         self.base_logger.info("   [+] Edit mode detected. Applying targeted adjustments.")
-        edit_prompt = PromptTemplate.from_template(self.prompts["chain"]["fast_ai_edit_initial"])
+        prompt_template = self._get_prompt("chain", "fast_ai_edit_initial")
+        edit_prompt = PromptTemplate.from_template(prompt_template)
         parser = StrOutputParser()
         chain = edit_prompt | self.pro_llm | parser
         llm_response = chain.invoke(
@@ -90,7 +100,7 @@ class ManimFastAnimationService(BaseManimAgent):
         }
 
     def _generate_initial_script_generate(self, state: ManimGraphState):
-        script = self.generate_script_with_prompt(state["animation_plan"])
+        script = self._generate_script_with_prompt(state["animation_plan"])
 
         self.base_logger.debug(f"   [+] Initial script generated (length: {len(script)})")
         return {
@@ -185,7 +195,8 @@ class ManimFastAnimationService(BaseManimAgent):
         """[Node 5] エラーに基づきスクリプトを修正"""
         self.base_logger.info(f"--- 5. [Node] Refining Script (Attempt {state['current_retry'] + 1}) ---")
 
-        repair_prompt = PromptTemplate.from_template(self.prompts["chain"]["fast_ai_refine_patch"])
+        prompt_template = self._get_prompt("chain", "fast_ai_refine_patch")
+        repair_prompt = PromptTemplate.from_template(prompt_template)
 
         parser = StrOutputParser()
 
@@ -299,6 +310,10 @@ class ManimFastAnimationService(BaseManimAgent):
         """
         動画生成のメイン関数
         """
+        # ユーザー入力から言語を検出してインスタンスに保存
+        self._current_language = self._detect_language(content)
+        self.base_logger.info(f"Detected language: {self._current_language}")
+
         initial_state: ManimGraphState = {
             "user_request": "",
             "generation_instructions": enhance_prompt,
@@ -340,6 +355,10 @@ class ManimFastAnimationService(BaseManimAgent):
         """
         既存のスクリプトを編集して動画を生成するメイン関数
         """
+        # 編集指示から言語を検出してインスタンスに保存
+        self._current_language = self._detect_language(edit_instructions)
+        self.base_logger.info(f"Detected language: {self._current_language}")
+
         initial_state: ManimGraphState = {
             "user_request": edit_instructions,
             "generation_instructions": "",
@@ -374,11 +393,16 @@ class ManimFastAnimationService(BaseManimAgent):
     def manim_planner(self, content: str, enhance_prompt: str) -> str:
         """
         Manimのアニメーションプランを生成する関数
+        ユーザー入力 (content) から言語を自動検出してプロンプトを選択する
         """
+        # 言語を検出してインスタンスに保存
+        self._current_language = self._detect_language(content)
+
+        prompt_template = self._get_prompt("chain", "manim_planer_with_instruct")
         manim_planer = PromptTemplate(
             input_variables=["user_prompt"],
             optional_variables=["video_enhance_prompt"],
-            template=self.prompts["chain"]["manim_planer_with_instruct"],
+            template=prompt_template,
         )
         parser = StrOutputParser()
 

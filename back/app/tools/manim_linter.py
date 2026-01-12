@@ -27,6 +27,7 @@ import manim
 # manim API 情報
 # ============================================================
 
+
 class ManimAPIDatabase:
     """manim 0.19.0 の API 情報を introspection で集める"""
 
@@ -55,13 +56,14 @@ class ManimAPIDatabase:
 # Lint メッセージ
 # ============================================================
 
+
 @dataclass
 class LintMessage:
     filename: str
     lineno: int
     col_offset: int
     level: str  # "WARNING" / "ERROR"
-    code: str   # 例: "MANIM001"
+    code: str  # 例: "MANIM001"
     message: str
 
     def format(self) -> str:
@@ -71,6 +73,7 @@ class LintMessage:
 # ============================================================
 # Linter 本体
 # ============================================================
+
 
 class Manim019Linter(ast.NodeVisitor):
     """
@@ -96,9 +99,7 @@ class Manim019Linter(ast.NodeVisitor):
         self.scope_stack: List[Set[str]] = [set()]  # 定義名トラッキング
 
         # 安定した builtins 判定
-        self.python_builtins: Set[str] = {
-            name for name in dir(py_builtins) if not name.startswith("_")
-        }
+        self.python_builtins: Set[str] = {name for name in dir(py_builtins) if not name.startswith("_")}
 
         # super().__init__ に明示で渡される予約キーワードのキャッシュ
         self._reserved_kw_cache: Dict[str, Set[str]] = {}
@@ -327,9 +328,7 @@ class Manim019Linter(ast.NodeVisitor):
                 self.add_message(
                     node,
                     code="MANIM001",
-                    message=(
-                        f"'{name}' は manim 0.19.0 のシンボルに存在しません。"
-                    ),
+                    message=(f"'{name}' は manim 0.19.0 のシンボルに存在しません。"),
                 )
 
         # 属性呼び出し（Axes.s(...), Line.foo(...), Text.from_markup(...), etc.）
@@ -343,9 +342,7 @@ class Manim019Linter(ast.NodeVisitor):
                         self.add_message(
                             node,
                             code="MANIM010",
-                            message=(
-                                f"'self.camera'（{cam_symbol}）に属性 '{attr_name}' は存在しません。"
-                            ),
+                            message=(f"'self.camera'（{cam_symbol}）に属性 '{attr_name}' は存在しません。"),
                         )
                         self.generic_visit(node)
                         return
@@ -354,9 +351,7 @@ class Manim019Linter(ast.NodeVisitor):
                         self.add_message(
                             node,
                             code="MANIM020",
-                            message=(
-                                f"'{cam_symbol}.{attr_name}' は関数/クラスではないため、呼び出せません。"
-                            ),
+                            message=(f"'{cam_symbol}.{attr_name}' は関数/クラスではないため、呼び出せません。"),
                         )
                         self.generic_visit(node)
                         return
@@ -374,9 +369,7 @@ class Manim019Linter(ast.NodeVisitor):
                             self.add_message(
                                 owner,
                                 code="MANIM001",
-                                message=(
-                                    f"'{owner_name}' は manim 0.19.0 のシンボルに存在しません。"
-                                ),
+                                message=(f"'{owner_name}' は manim 0.19.0 のシンボルに存在しません。"),
                             )
                             self.generic_visit(node)
                             return
@@ -435,11 +428,7 @@ class Manim019Linter(ast.NodeVisitor):
         except (TypeError, ValueError):
             return
         params = sig.parameters
-        param_names = {
-            name
-            for name, p in params.items()
-            if p.kind in (p.POSITIONAL_OR_KEYWORD, p.KEYWORD_ONLY)
-        }
+        param_names = {name for name, p in params.items() if p.kind in (p.POSITIONAL_OR_KEYWORD, p.KEYWORD_ONLY)}
         has_var_kw = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values())
 
         for kw in node.keywords:
@@ -486,6 +475,7 @@ class Manim019Linter(ast.NodeVisitor):
             class _SuperInitKWVisitor(ast.NodeVisitor):
                 def __init__(self) -> None:
                     self.found: Set[str] = set()
+
                 def visit_Call(self, call: ast.Call) -> None:
                     if (
                         isinstance(call.func, ast.Attribute)
@@ -547,6 +537,7 @@ class Manim019Linter(ast.NodeVisitor):
 # ============================================================
 # ユーティリティ
 # ============================================================
+
 
 def classify_error_code(code: str) -> str:
     if code in ("MANIM040", "MANIM041"):
@@ -622,9 +613,7 @@ class ManimLinter:
     def __init__(self, api_db: Optional[ManimAPIDatabase] = None) -> None:
         self.api_db = api_db or ManimAPIDatabase()
 
-    def check_code(
-        self, code: str, *, filename: str = "<generated>"
-    ) -> Dict[str, Any]:
+    def check_code(self, code: str, *, filename: str = "<generated>") -> Dict[str, Any]:
         issues = lint_text_structured(code, filename=filename, api_db=self.api_db)
         if not issues:
             return {

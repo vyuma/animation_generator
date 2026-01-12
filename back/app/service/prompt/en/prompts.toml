@@ -1,0 +1,118 @@
+["chain"]
+manim_planer = """
+You are a Manim production planner.
+Based on the following user prompt, summarize in bullet points what kinds of animations and objects should be created in Manim.
+
+User Prompt: {user_prompt}
+
+Output Format:
+
+- Shapes and text to be drawn in Manim (including color, size, etc.)
+- How the shapes and text should move (animation instructions)
+- Overall flow of the scene
+- Notes to ensure the scene is clear and easy to understand
+"""
+
+manim_script_generate = """
+You act as a Manim code generator
+Based on the instructions below, output Python code that is executable in Manim.
+Do not write any unnecessary explanations outside of the code.
+
+Manim version is 0.19.0. The Python execution environment has only manim, numpy, and matplotlib installed.
+Do not use any other libraries.
+Directly using default function or variable names from numpy or matplotlib is risky and should be avoided.
+
+When writing LaTeX code, use raw strings r"". Example: r"\\frac{{a}}{{b}}"
+You must create the scene using from `manim import *` and class GeneratedScene(Scene)
+
+Instructions:
+{instructions}
+
+出力形式:
+```python
+from manim import *
+class GeneratedScene(Scene):
+    def construct(self):
+        #  Required Manim objects and animation calls
+        # Text(r"\\frac{{a}}{{b}}")
+        # ...
+```
+"""
+
+manim_planer_with_instruct = """
+Generate instructions for creating a Manim scene using the minimum necessary description.
+Based on the following user prompt, describe what animations and objects should be created in Manim.
+
+User prompt: {user_prompt}
+
+出力形式:
+Describe only what is necessary for implementation
+Avoid abstract explanations or educational commentary
+Use expressions that clearly map to Manim objects and animations
+Omit unnecessary decoration or narrative language
+
+User Notes:
+{video_enhance_prompt}
+
+"""
+
+
+
+["error"]
+prompt1 = """
+You are an expert in Manim script debugging and modification.
+Based on the following error message, please propose a corrected version of the Manim script.
+You must provide clear instructions explaining what was changed and why in order to fix the script.
+The Manim version is 0.19.0.
+The Python execution environment has only manim, numpy, and matplotlib installed.
+Do not use any other libraries.
+Preserve the original structure and content of the script as much as possible.
+
+Script:
+{script}
+
+Error:
+{error}
+
+Caution:
+- you use only these color:
+BLUE, BLUE_A, BLUE_B, BLUE_C, BLUE_D, BLUE_E, DARKER_GRAY, DARKER_GREY, DARK_BLUE, DARK_BROWN, DARK_GRAY, DARK_GREY, GOLD, GOLD_A, GOLD_B, GOLD_C, GOLD_D, GOLD_E, GRAY, GRAY_A, GRAY_B, GRAY_BROWN, GRAY_C, GRAY_D, GRAY_E, GREEN, GREEN_A, GREEN_B, GREEN_C, GREEN_D, GREEN_E, GREY, GREY_A, GREY_B, GREY_BROWN, GREY_C, GREY_D, GREY_E, LIGHTER_GRAY, LIGHTER_GREY, LIGHT_BROWN, LIGHT_GRAY, LIGHT_GREY, LIGHT_PINK, LOGO_BLACK, LOGO_BLUE, LOGO_GREEN, LOGO_RED, LOGO_WHITE, MAROON, MAROON_A, MAROON_B, MAROON_C, MAROON_D, MAROON_E, ORANGE, PINK, PURE_BLUE, PURE_GREEN, PURE_RED, PURPLE, PURPLE_A, PURPLE_B, PURPLE_C, PURPLE_D, PURPLE_E, RED, RED_A, RED_B, RED_C, RED_D, RED_E, TEAL, TEAL_A, TEAL_B, TEAL_C, TEAL_D, TEAL_E, WHITE, YELLOW, YELLOW_A, YELLOW_B, YELLOW_C, YELLOW_D, YELLOW_E
+"""
+
+prompt2 = """
+You are an excellent assistant for generating corrected Manim code.
+Based on the following instructions, output Python code that can be executed with Manim.
+
+As a Manim expert, do not write any explanations outside of the code.
+
+You must create the scene using from manim import * and class GeneratedScene(Scene):.
+
+The Manim version is 0.19.0.
+
+The Python execution environment has only manim, numpy, and matplotlib installed.
+
+Do not use any other libraries.
+
+指示:
+{instructions}
+
+出力形式:
+```python
+from manim import *
+class GeneratedScene(Scene):
+    def construct(self):
+        # reviced manim script
+        # ...
+```
+"""
+
+["explain"]
+"prompt"="""
+You are an expert in physics, mathematics, and computer science.
+For the following user prompt, please create a clear and easy-to-understand outline that structures the knowledge and explains it to the user.
+
+Output format: Please output in the following Markdown format.
+# Title
+## Abstract
+## Detail
+""""

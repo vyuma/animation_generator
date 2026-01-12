@@ -48,14 +48,13 @@ def run_pyright(path: str | Path):
     diagnostics = data.get("generalDiagnostics", [])
 
     # 🔽 「Wildcard import」警告を除外
-    filtered_diagnostics = [
-        d for d in diagnostics
-        if "Wildcard import" not in d["message"]
-    ]
+    filtered_diagnostics = [d for d in diagnostics if "Wildcard import" not in d["message"]]
 
     print(f" Pyright finished: {summary.get('filesAnalyzed', 0)} files analyzed.")
-    print(f" {len([d for d in filtered_diagnostics if d['severity']=='error'])} errors "
-          f"|  {len([d for d in filtered_diagnostics if d['severity']=='warning'])} warnings\n")
+    print(
+        f" {len([d for d in filtered_diagnostics if d['severity'] == 'error'])} errors "
+        f"|  {len([d for d in filtered_diagnostics if d['severity'] == 'warning'])} warnings\n"
+    )
 
     # --- 詳細なエラー出力 ---
     if filtered_diagnostics:
@@ -96,13 +95,13 @@ def format_and_linter(path: str | Path = "."):
     else:
         print("⚠️ Pyright returned no summary.")
     print("\n✅ Lint check finished.")
-    
+
     return report
 
 
 if __name__ == "__main__":
     target = "tmp/abc.py"
-    report=format_and_linter(target)
+    report = format_and_linter(target)
     pprint(report)
 
 
