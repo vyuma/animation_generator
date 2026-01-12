@@ -1,4 +1,4 @@
-["chain"]
+[chain]
 manim_planer = """
 You are a Manim production planner.
 Based on the following user prompt, summarize in bullet points what kinds of animations and objects should be created in Manim.
@@ -28,7 +28,7 @@ You must create the scene using from `manim import *` and class GeneratedScene(S
 Instructions:
 {instructions}
 
-出力形式:
+Output format:
 ```python
 from manim import *
 class GeneratedScene(Scene):
@@ -45,7 +45,7 @@ Based on the following user prompt, describe what animations and objects should 
 
 User prompt: {user_prompt}
 
-出力形式:
+Output format:
 Describe only what is necessary for implementation
 Avoid abstract explanations or educational commentary
 Use expressions that clearly map to Manim objects and animations
@@ -58,7 +58,7 @@ User Notes:
 
 
 
-["error"]
+[error]
 prompt1 = """
 You are an expert in Manim script debugging and modification.
 Based on the following error message, please propose a corrected version of the Manim script.
@@ -93,10 +93,10 @@ The Python execution environment has only manim, numpy, and matplotlib installed
 
 Do not use any other libraries.
 
-指示:
+Instructions:
 {instructions}
 
-出力形式:
+Output format:
 ```python
 from manim import *
 class GeneratedScene(Scene):
@@ -106,8 +106,8 @@ class GeneratedScene(Scene):
 ```
 """
 
-["explain"]
-"prompt"="""
+[explain]
+prompt = """
 You are an expert in physics, mathematics, and computer science.
 For the following user prompt, please create a clear and easy-to-understand outline that structures the knowledge and explains it to the user.
 
@@ -115,4 +115,4 @@ Output format: Please output in the following Markdown format.
 # Title
 ## Abstract
 ## Detail
-""""
+"""

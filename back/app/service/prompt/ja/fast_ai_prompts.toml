@@ -1,4 +1,4 @@
-["chain"]
+[chain]
 manim_script_generate = """
 あなたは優秀な Manim コード生成の専門家です。
 以下の指示に基づいて、Manim で実行可能な Python コードを出力してください。

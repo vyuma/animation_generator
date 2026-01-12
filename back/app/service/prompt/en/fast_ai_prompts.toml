@@ -1,4 +1,4 @@
-["chain"]
+[chain]
 manim_script_generate = """
 You are an expert in Manim code generation.
 Based on the following instructions, output Python code executable in Manim.
@@ -27,7 +27,7 @@ class GeneratedScene(Scene):
         self.camera.background_color = BLACK
         # ...
 ```
-"
+"""
 
 
 manim_planer_with_instruct = """
@@ -44,7 +44,7 @@ Output Format:
 
 Notes from user:
 {video_enhance_prompt}
-"
+"""
 
 
 fast_ai_refine_patch = """
@@ -68,7 +68,7 @@ Strict Output Format Requirements:
 - Each hunk must include at least 3 lines of context (lines starting with ` `) before and after the change.
 - The `@@` line must include the start line number and line count.
 - Do not output anything other than the diff-fenced code block including `*** Begin Patch` and `*** End Patch`.
-"
+"""
 
 fast_ai_edit_initial = """
 You are a professional Manim 0.19.0 developer.
@@ -79,4 +79,4 @@ Requirements:
 2. Output only the Unified Diff (unidiff) within a diff-fenced code block; do not include explanations or the full completed code.
 3. Each hunk must include at least 3 lines of context before and after the change, using the `@@ -<start_line>,<deleted_lines> +<start_line>,<added_lines> @@` format hunk header.
 4. Do not output anything other than the diff-fenced code block including `*** Begin Patch` and `*** End Patch`.
-""
+"""

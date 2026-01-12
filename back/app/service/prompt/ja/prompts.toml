@@ -1,4 +1,4 @@
-["chain"]
+[chain]
 manim_planer = """
 あなたは Manim のプロダクションプランナーです。次のユーザーのプロンプトに基づいて、Manim でどのようなアニメーションや図形を作成すべきかを箇条書きで要約してください。
 
@@ -57,7 +57,7 @@ manim_planer_with_instruct = """
 
 
 
-["error"]
+[error]
 prompt1 = """
 あなたは Manim スクリプト修正の専門家です。以下のエラーメッセージに基づいて、Manim スクリプトの修正版を提案してください。
 スクリプトを修正するための指示を必ず提供してください。
@@ -98,13 +98,13 @@ class GeneratedScene(Scene):
 """
 
 
-["explain"]
-"prompt"="""
+[explain]
+prompt = """
 あなたは物理学・数学・情報科学の専門家です。
 次のユーザープロンプトに対して知識を構造化してユーザーに解説するためのわかりやすいアウトラインを作成してください。
 User Prompt: {input_text}manim_planer_with_instruct
-出力形式: 以下のMarkdownで出力してください。 
+出力形式: 以下のMarkdownで出力してください。
 # タイトル
 ## 概要
 ## 詳細な説明
-""""
+"""
