@@ -1,16 +1,14 @@
+import os
 from pathlib import Path
 
-import os
 from dotenv import load_dotenv
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
-from typing import Optional
 
-
-from app.service.fast_ai_agent import ManimFastAnimationService
-from app.service.base_agent import SuccessResponse, PlanResponse
 from app.model.model import VideoDatabase, get_video_db
+from app.service.base_agent import PlanResponse, SuccessResponse
+from app.service.fast_ai_agent import ManimFastAnimationService
 from app.service.template_service import TemplateService
 
 load_dotenv()
@@ -25,7 +23,7 @@ video_path = Path(os.getenv("VIDEO_OUTPUT_PATH"))
 # ---------- Pydantic Models ----------
 class ConceptInput(BaseModel):
     text: str
-    additional_instructions: Optional[str] = ""
+    additional_instructions: str | None = ""
 
 
 class Output(BaseModel):

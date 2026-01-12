@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from dotenv import load_dotenv
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 from app.tools.template_data.template_rag_store import TemplateRAGStore
-
 
 load_dotenv()
 
@@ -23,7 +22,7 @@ class TemplateService:
         self.google_api_key = os.getenv("GEMINI_API_KEY")
 
         self._rag_store = TemplateRAGStore()
-        self._summary_llm: Optional[ChatGoogleGenerativeAI] = None
+        self._summary_llm: ChatGoogleGenerativeAI | None = None
 
     def _ensure_summary_llm(self) -> ChatGoogleGenerativeAI:
         if not self.google_api_key:
@@ -43,7 +42,7 @@ class TemplateService:
         if isinstance(content, str):
             return content.strip()
         if isinstance(content, list):
-            parts: List[str] = []
+            parts: list[str] = []
             for block in content:
                 if isinstance(block, dict) and "text" in block:
                     parts.append(block["text"])
@@ -95,7 +94,7 @@ class TemplateService:
         *,
         query: str,
         max_gets: int = 12,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """RAGストアから類似テンプレートを検索する。"""
         if not query:
             return []

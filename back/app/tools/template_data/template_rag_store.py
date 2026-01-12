@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import shutil
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from dotenv import load_dotenv
-
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
+
 from app.model.model import VideoDatabase
 
 
@@ -90,7 +89,7 @@ class TemplateRAGStore:
         *,
         query: str,
         max_gets: int = 12,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Chroma 既定の類似度で上位 max_gets 件の結果を返す。
         """
@@ -103,7 +102,7 @@ class TemplateRAGStore:
             # 空DBのときなど
             return []
 
-        out: List[Dict[str, Any]] = []
+        out: list[dict[str, Any]] = []
         for doc, score in doc_scores:
             out.append(
                 {
@@ -175,11 +174,11 @@ class TemplateRAGStore:
         if seeded:
             self.seed_marker.write_text(datetime.utcnow().isoformat())
 
-    def _collect_template_pairs(self) -> List[Dict[str, Any]]:
+    def _collect_template_pairs(self) -> list[dict[str, Any]]:
         """
         template_code_with_video ディレクトリから (.py, .mp4) のペアを抽出する。
         """
-        pairs: List[Dict[str, Any]] = []
+        pairs: list[dict[str, Any]] = []
         for script_path in sorted(self.template_dir.glob("*.py")):
             name = script_path.stem
             video_path = self.template_dir / f"{name}.mp4"
@@ -235,7 +234,7 @@ class TemplateRAGStore:
             )
         return prompt_file.name
 
-    def _load_summary_cache(self) -> Dict[str, Any]:
+    def _load_summary_cache(self) -> dict[str, Any]:
         if self.summary_cache_path.exists():
             try:
                 data = json.loads(self.summary_cache_path.read_text(encoding="utf-8"))

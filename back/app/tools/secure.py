@@ -33,11 +33,9 @@ manim セキュリティチェック
 """
 
 import ast
-from typing import List, Tuple, Optional, Dict, Set
-
 
 # --- 完全修飾名で NG な関数/メソッド ---
-BANNED_FQNS: Set[str] = {
+BANNED_FQNS: set[str] = {
     # メタ実行（builtins）
     "builtins.eval",
     "builtins.exec",
@@ -63,7 +61,7 @@ BANNED_FQNS: Set[str] = {
 }
 
 # NumPy の I/O サフィックス（サブモジュール経由でも封じる）
-NUMPY_IO_SUFFIXES: Set[str] = {
+NUMPY_IO_SUFFIXES: set[str] = {
     "save",
     "savez",
     "savez_compressed",
@@ -77,7 +75,7 @@ NUMPY_IO_SUFFIXES: Set[str] = {
 }
 
 # 危険 prefix
-BANNED_PREFIXES: Tuple[str, ...] = (
+BANNED_PREFIXES: tuple[str, ...] = (
     "numpy.ctypeslib",  # 共有ライブラリ読込など
     "numpy.lib.format",  # open_memmap 等
     "subprocess",  # 外部コマンド全般
@@ -85,14 +83,14 @@ BANNED_PREFIXES: Tuple[str, ...] = (
     "shutil",
 )
 
-PATH_WRITE_METHODS: Set[str] = {"write_text", "write_bytes"}
-PATH_READ_METHODS: Set[str] = {"read_text", "read_bytes"}
+PATH_WRITE_METHODS: set[str] = {"write_text", "write_bytes"}
+PATH_READ_METHODS: set[str] = {"read_text", "read_bytes"}
 
 # ndarray 由来のファイル/シリアライズ I/O（受け手に依らず属性名でブロック）
-NDARRAY_IO_ATTRS: Set[str] = {"tofile", "dump"}
+NDARRAY_IO_ATTRS: set[str] = {"tofile", "dump"}
 
 # --- 反射・辞書経由で危険になりやすいダンダー ---
-SUSPICIOUS_DUNDERS: Set[str] = {
+SUSPICIOUS_DUNDERS: set[str] = {
     "__builtins__",
     "__globals__",
     "__dict__",
@@ -102,7 +100,7 @@ SUSPICIOUS_DUNDERS: Set[str] = {
 }
 
 # __builtins__ 等から取り出されたら NG なキー
-DANGEROUS_BUILTIN_KEYS: Set[str] = {
+DANGEROUS_BUILTIN_KEYS: set[str] = {
     "open",
     "eval",
     "exec",
@@ -112,10 +110,10 @@ DANGEROUS_BUILTIN_KEYS: Set[str] = {
 }
 
 # subprocess で危険になり得る KW
-SUBPROC_DANGEROUS_KW: Set[str] = {"shell", "executable"}
+SUBPROC_DANGEROUS_KW: set[str] = {"shell", "executable"}
 
 
-def _const_str(n: ast.AST) -> Optional[str]:
+def _const_str(n: ast.AST) -> str | None:
     return n.value if isinstance(n, ast.Constant) and isinstance(n.value, str) else None
 
 
@@ -132,14 +130,14 @@ class StrictGuard(ast.NodeVisitor):
     """
 
     def __init__(self) -> None:
-        self.findings: List[Tuple[int, str]] = []
+        self.findings: list[tuple[int, str]] = []
         # as エイリアス（モジュール名解決: {"np": "numpy", "numpy": "numpy"}）
-        self.module_alias: Dict[str, str] = {}
+        self.module_alias: dict[str, str] = {}
         # 代入された参照の簡易解決（f = np.save / y = numpy.lib.format）
         # 値は "numpy.save" や "numpy.lib.format" などの FQN
-        self.name_bindings: Dict[str, str] = {}
+        self.name_bindings: dict[str, str] = {}
         # Subscript 由来で束縛された「汚染済みの別名」
-        self.tainted_from_subscript: Set[str] = set()
+        self.tainted_from_subscript: set[str] = set()
 
     # ---------- 許可 import 判定 ----------
     @staticmethod
@@ -225,7 +223,7 @@ class StrictGuard(ast.NodeVisitor):
         self.generic_visit(node)
 
     # ---------- FQN 解決（Name/Attribute/既知束縛/モジュールエイリアス） ----------
-    def _resolve_fqn(self, node: ast.AST) -> Optional[str]:
+    def _resolve_fqn(self, node: ast.AST) -> str | None:
         if isinstance(node, ast.Name):
             # 代入束縛を最優先
             if node.id in self.name_bindings:
@@ -252,7 +250,7 @@ class StrictGuard(ast.NodeVisitor):
 
     # __builtins__ / __globals__ / __dict__ から危険キーを引く Subscript を検出
     def _check_subscript_builtins(
-        self, node: ast.AST, lineno: int, assign_targets: Optional[List[ast.expr]] = None
+        self, node: ast.AST, lineno: int, assign_targets: list[ast.expr] | None = None
     ) -> None:
         # __builtins__/__globals__/__dict__ などのコンテナから危険キーを引くパターンを検出
         def is_suspicious_container(n: ast.AST) -> bool:
@@ -367,7 +365,7 @@ class StrictGuard(ast.NodeVisitor):
         self.generic_visit(node)
 
 
-def analyze_code(code: str) -> Tuple[bool, List[Tuple[int, str]]]:
+def analyze_code(code: str) -> tuple[bool, list[tuple[int, str]]]:
     """
     解析して (安全かどうか, 検出内容のリスト) を返す。
     """

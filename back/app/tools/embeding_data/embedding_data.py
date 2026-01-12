@@ -3,7 +3,7 @@ import json
 
 # Main processing loop
 processed_chunks = []
-with open("chunk_output.jsonl", "r") as f:
+with open("chunk_output.jsonl") as f:
     for line in f:
         raw_item = json.loads(line)
         # print(raw_item)
@@ -11,8 +11,8 @@ with open("chunk_output.jsonl", "r") as f:
 
 # Now `processed_chunks` contains the final chunks ready for embedding.
 # (in process_data.py)
-from sentence_transformers import SentenceTransformer
 import torch
+from sentence_transformers import SentenceTransformer
 
 print(f"Total chunks to embed: {len(processed_chunks)}")
 device = "cuda" if torch.cuda.is_available() else "cpu"

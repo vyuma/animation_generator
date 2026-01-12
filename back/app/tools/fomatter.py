@@ -1,4 +1,6 @@
-import re, ast, html
+import ast
+import html
+import re
 
 CODEBLOCK_RE = re.compile(r"```(?:\s*python)?\s*\n(.*?)```", re.DOTALL | re.IGNORECASE)
 

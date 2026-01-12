@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 
 class DiffApplyError(Exception):
@@ -42,7 +42,7 @@ class DiffPatcher:
 
     # ---------- Cleaners / Extractors ----------
     @staticmethod
-    def _extract_diff_block(response_text: str) -> Optional[str]:
+    def _extract_diff_block(response_text: str) -> str | None:
         """
         LLM 応答から diff ブロックのみを抽出する。
         対応形式：
@@ -96,7 +96,7 @@ class DiffPatcher:
 
     # ---------- Diff Parsing (manual) ----------
 
-    def _parse_unified_diff_to_hunks(self, diff_text: str) -> List[Dict[str, Any]]:
+    def _parse_unified_diff_to_hunks(self, diff_text: str) -> list[dict[str, Any]]:
         """
         unified diff テキスト（複数ファイル・複数ハンク可）を、
         構造化された "ハンク" の配列へ変換する。
@@ -110,8 +110,8 @@ class DiffPatcher:
         file_from = None  # --- a/xxx に対応（今は参照のみ）
         file_to = None  # +++ b/xxx に対応（今は参照のみ）
 
-        hunks: List[Dict[str, Any]] = []
-        current_hunk: Optional[Dict[str, Any]] = None
+        hunks: list[dict[str, Any]] = []
+        current_hunk: dict[str, Any] | None = None
 
         # ハンクヘッダ（@@ -a,b +c,d @@）を拾う正規表現
         hunk_re = re.compile(r"^@@\s*-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s*@@.*$")
@@ -189,15 +189,15 @@ class DiffPatcher:
         return hunks
 
     @staticmethod
-    def _finalize_hunk(hunk: Dict[str, Any]) -> None:
+    def _finalize_hunk(hunk: dict[str, Any]) -> None:
         """
         ハンクに対して、適用に使う補助配列を作る。
           - from_lines: "削除＋コンテキスト"（= 置き換え対象に一致させる元の並び）
           - to_lines  : "追加＋コンテキスト"（= 置き換え後の並び）
         """
         body = hunk.get("lines", [])
-        from_lines: List[str] = []
-        to_lines: List[str] = []
+        from_lines: list[str] = []
+        to_lines: list[str] = []
 
         # "空白/削除" は from_lines に、"空白/追加" は to_lines に入れる
         for tag, content in body:
@@ -212,18 +212,18 @@ class DiffPatcher:
     # ---------- Pattern Matching Engine ----------
     @staticmethod
     def _find_all_subsequence(
-        haystack: List[str],
-        needle: List[str],
+        haystack: list[str],
+        needle: list[str],
         start: int = 0,
-        end: Optional[int] = None,
-    ) -> List[int]:
+        end: int | None = None,
+    ) -> list[int]:
         """
         連続部分列 needle が一致するすべての開始位置を返す（重なりなし進行）。
         """
         if end is None:
             end = len(haystack)
         n = len(needle)
-        idxs: List[int] = []
+        idxs: list[int] = []
         if n == 0:
             return [start]
         i = max(start, 0)
@@ -242,11 +242,11 @@ class DiffPatcher:
 
     def _apply_hunk_within_window(
         self,
-        lines: List[str],
-        hunk: Dict[str, Any],
+        lines: list[str],
+        hunk: dict[str, Any],
         window_start: int,
         window_end: int,
-    ) -> Tuple[bool, List[str]]:
+    ) -> tuple[bool, list[str]]:
         """
         指定ウィンドウ内で from_lines を探して置換。
         成功： (True, 置換後行列) / 失敗： (False, 元の行列)
@@ -288,7 +288,7 @@ class DiffPatcher:
 
         return False, lines
 
-    def _apply_diff_by_pattern(self, original_script: str, diff_text: str) -> Tuple[str, int, int]:
+    def _apply_diff_by_pattern(self, original_script: str, diff_text: str) -> tuple[str, int, int]:
         """
         ハンクを上から順に"最良努力"で適用していく本体。
         戻り値: (更新後スクリプト, 適用できたハンク数, 総ハンク数)

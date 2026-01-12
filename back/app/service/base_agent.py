@@ -1,28 +1,23 @@
+import json
 import os
-
 import subprocess
-from pathlib import Path
-from dotenv import load_dotenv
 import tomllib
+import uuid
 from abc import ABC, abstractmethod
+from pathlib import Path
 
-from langchain_openai import ChatOpenAI
-from langchain_google_genai import ChatGoogleGenerativeAI
+from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
 from langchain_community.chat_models import ChatOllama
-
-import uuid
-import json
-from pydantic import BaseModel
-from typing import Optional
-from langdetect import detect, LangDetectException
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
+from langdetect import LangDetectException, detect
 from loguru import logger
+from pydantic import BaseModel
 
-from app.tools.secure import is_code_safe
-from app.tools.manim_linter import ManimLinter
-from app.tools.manim_lint import parse_manim_or_python_traceback, format_error_for_llm
 from app.tools.diff_patcher import DiffPatcher
-
+from app.tools.manim_linter import ManimLinter
+from app.tools.secure import is_code_safe
 
 load_dotenv()
 
@@ -45,16 +40,16 @@ LLMの初期化と共通のユーティリティ関数を提供する関数と�
 
 class SuccessResponse(BaseModel):
     ok: bool
-    message: Optional[str] = None
-    video_path: Optional[str] = None
-    prompt_path: Optional[str] = None
-    manim_code_path: Optional[str] = None
-    video_id: Optional[str] = None
+    message: str | None = None
+    video_path: str | None = None
+    prompt_path: str | None = None
+    manim_code_path: str | None = None
+    video_id: str | None = None
 
 
 class PlanResponse(BaseModel):
     plan: str
-    generation_id: Optional[int] = None
+    generation_id: int | None = None
 
 
 class BaseManimAgent(ABC):
@@ -301,7 +296,7 @@ class BaseManimAgent(ABC):
 
             # まずファイルを読み込む
 
-            with open(prompt_json_path, "r", encoding="utf-8") as f:
+            with open(prompt_json_path, encoding="utf-8") as f:
                 data = json.load(f)
 
             # データ構造を修正
@@ -328,7 +323,7 @@ class BaseManimAgent(ABC):
     def _get_script(self, video_id: str) -> str:
         """[Helper] manimスクリプトの取得"""
         script_path = self.manim_scripts_path / f"{video_id}.py"
-        with open(script_path, "r", encoding="utf-8") as f:
+        with open(script_path, encoding="utf-8") as f:
             script = f.read()
         return script
 

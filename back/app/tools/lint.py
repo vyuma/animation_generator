@@ -1,5 +1,5 @@
-import subprocess
 import json
+import subprocess
 import sys
 from pathlib import Path
 from pprint import pprint

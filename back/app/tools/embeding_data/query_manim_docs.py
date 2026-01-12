@@ -1,7 +1,7 @@
 # query_manim_docs.py
 
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
 
 persist_dir = "./manim_chroma_db"
 

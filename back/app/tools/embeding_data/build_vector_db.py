@@ -1,12 +1,13 @@
 import json
-from langchain_community.vectorstores import Chroma
+
 from langchain.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import Chroma
 
 # --- Step 1: Load JSONL ---
 input_path = "embedded_data.jsonl"
 texts, metadatas, embeddings = [], [], []
 
-with open(input_path, "r", encoding="utf-8") as f:
+with open(input_path, encoding="utf-8") as f:
     for line in f:
         d = json.loads(line)
         texts.append(d["text"])

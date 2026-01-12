@@ -15,13 +15,12 @@ manim 0.19.0 専用の linter（色は直接名のみチェック + 属性呼び
 from __future__ import annotations
 
 import ast
+import builtins as py_builtins
 import inspect
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
-import builtins as py_builtins
 import manim
-
 
 # ============================================================
 # manim API 情報
@@ -32,10 +31,10 @@ class ManimAPIDatabase:
     """manim 0.19.0 の API 情報を introspection で集める"""
 
     def __init__(self) -> None:
-        self.globals: Dict[str, Any] = dict(vars(manim))
+        self.globals: dict[str, Any] = dict(vars(manim))
 
         # Color 判定: to_hex / to_rgb / to_rgba を持つオブジェクトを Color とみなす
-        self.colors: Set[str] = set()
+        self.colors: set[str] = set()
         for name, obj in self.globals.items():
             if callable(obj):
                 continue
@@ -85,7 +84,7 @@ class Manim019Linter(ast.NodeVisitor):
     COLOR_KWARGS = {"color", "stroke_color", "fill_color", "background_color"}
 
     # フォールバック: 既知の予約キーワード衝突（ソース解析できなかった場合）
-    _CONFLICTING_KW_FALLBACK: Dict[str, Set[str]] = {
+    _CONFLICTING_KW_FALLBACK: dict[str, set[str]] = {
         # Sector(radius=...) が super で outer_radius/inner_radius を渡すため衝突
         "Sector": {"outer_radius", "inner_radius"},
     }
@@ -93,18 +92,18 @@ class Manim019Linter(ast.NodeVisitor):
     def __init__(self, filename: str, api_db: ManimAPIDatabase) -> None:
         self.filename = filename
         self.api_db = api_db
-        self.messages: List[LintMessage] = []
+        self.messages: list[LintMessage] = []
 
         self.star_import: bool = False  # `from manim import *` があるか
-        self.scope_stack: List[Set[str]] = [set()]  # 定義名トラッキング
+        self.scope_stack: list[set[str]] = [set()]  # 定義名トラッキング
 
         # 安定した builtins 判定
-        self.python_builtins: Set[str] = {name for name in dir(py_builtins) if not name.startswith("_")}
+        self.python_builtins: set[str] = {name for name in dir(py_builtins) if not name.startswith("_")}
 
         # super().__init__ に明示で渡される予約キーワードのキャッシュ
-        self._reserved_kw_cache: Dict[str, Set[str]] = {}
+        self._reserved_kw_cache: dict[str, set[str]] = {}
         # 解析中クラスの基底名セット（Scene系の検出用）
-        self.class_bases_stack: List[Set[str]] = []
+        self.class_bases_stack: list[set[str]] = []
 
     # ---------- スコープ管理 ----------
     def push_scope(self) -> None:
@@ -186,7 +185,7 @@ class Manim019Linter(ast.NodeVisitor):
         self.generic_visit(node)
         self.pop_scope()
 
-    def _base_name_of(self, node: ast.expr) -> Optional[str]:
+    def _base_name_of(self, node: ast.expr) -> str | None:
         if isinstance(node, ast.Name):
             return node.id
         if isinstance(node, ast.Attribute):
@@ -463,10 +462,10 @@ class Manim019Linter(ast.NodeVisitor):
                     ),
                 )
 
-    def _reserved_keywords_for(self, api_name: str, obj: Any) -> Set[str]:
+    def _reserved_keywords_for(self, api_name: str, obj: Any) -> set[str]:
         if api_name in self._reserved_kw_cache:
             return self._reserved_kw_cache[api_name]
-        kws: Set[str] = set()
+        kws: set[str] = set()
         try:
             target = getattr(obj, "__init__", obj)
             src = inspect.getsource(target)
@@ -474,7 +473,7 @@ class Manim019Linter(ast.NodeVisitor):
 
             class _SuperInitKWVisitor(ast.NodeVisitor):
                 def __init__(self) -> None:
-                    self.found: Set[str] = set()
+                    self.found: set[str] = set()
 
                 def visit_Call(self, call: ast.Call) -> None:
                     if (
@@ -554,8 +553,8 @@ def classify_error_code(code: str) -> str:
 def lint_text_structured(
     text: str,
     filename: str = "<memory>",
-    api_db: Optional[ManimAPIDatabase] = None,
-) -> List[Dict[str, Any]]:
+    api_db: ManimAPIDatabase | None = None,
+) -> list[dict[str, Any]]:
     """
     文字列ソースを直接 lint して構造化メッセージを返す。
     """
@@ -585,7 +584,7 @@ def lint_text_structured(
     linter.visit(tree)
     lines = text.splitlines()
 
-    results: List[Dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
     for m in linter.messages:
         lineno = m.lineno
         line_text = lines[lineno - 1] if 1 <= lineno <= len(lines) else ""
@@ -610,10 +609,10 @@ class ManimLinter:
     BaseAgent などから呼び出しやすいラッパークラス。
     """
 
-    def __init__(self, api_db: Optional[ManimAPIDatabase] = None) -> None:
+    def __init__(self, api_db: ManimAPIDatabase | None = None) -> None:
         self.api_db = api_db or ManimAPIDatabase()
 
-    def check_code(self, code: str, *, filename: str = "<generated>") -> Dict[str, Any]:
+    def check_code(self, code: str, *, filename: str = "<generated>") -> dict[str, Any]:
         issues = lint_text_structured(code, filename=filename, api_db=self.api_db)
         if not issues:
             return {
@@ -623,7 +622,7 @@ class ManimLinter:
                 "summary": "",
             }
 
-        summary_lines: List[str] = []
+        summary_lines: list[str] = []
         for item in issues:
             location = f"{item['filename']}:{item['lineno']}"
             detail = f"[{item['code']}] {item['message']}"

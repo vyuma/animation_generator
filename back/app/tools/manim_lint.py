@@ -1,12 +1,11 @@
 import re
-from typing import Dict, Optional, Tuple
 
 SITE_PKGS_MARKER = "/site-packages/"
 
 
 def _pick_best_frame(
-    frames: list[Tuple[str, int, Optional[str]]],
-) -> Tuple[Optional[str], Optional[int], Optional[str]]:
+    frames: list[tuple[str, int, str | None]],
+) -> tuple[str | None, int | None, str | None]:
     """Prefer the last frame not in site-packages; otherwise use the last frame."""
     if not frames:
         return None, None, None
@@ -16,7 +15,7 @@ def _pick_best_frame(
     return frames[-1]
 
 
-def _extract_code_from_rich_block(tb_text: str, target_line: int) -> Optional[str]:
+def _extract_code_from_rich_block(tb_text: str, target_line: int) -> str | None:
     """
     Extract code line shown by Rich-style frames like:
     '│   13 │ │ coin_int = VGroup(... )'
@@ -42,7 +41,7 @@ def _extract_code_from_rich_block(tb_text: str, target_line: int) -> Optional[st
     return candidate
 
 
-def _extract_code_after_frame_line(tb_text: str, frame_path: str, target_line: int) -> Optional[str]:
+def _extract_code_after_frame_line(tb_text: str, frame_path: str, target_line: int) -> str | None:
     """
     Fallback: from the frame line '/path/file.py:13 in ...', pick the next
     non-empty textual line as the code snippet (heuristic).
@@ -63,10 +62,10 @@ def _extract_code_after_frame_line(tb_text: str, frame_path: str, target_line: i
     return None
 
 
-def _read_code_from_file(path: str, target_line: int) -> Optional[str]:
+def _read_code_from_file(path: str, target_line: int) -> str | None:
     """Final fallback: read the source file directly."""
     try:
-        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        with open(path, encoding="utf-8", errors="ignore") as f:
             for i, line in enumerate(f, start=1):
                 if i == target_line:
                     return line.rstrip("\n")
@@ -75,7 +74,7 @@ def _read_code_from_file(path: str, target_line: int) -> Optional[str]:
     return None
 
 
-def parse_manim_or_python_traceback(tb_text: str) -> Dict[str, Optional[str]]:
+def parse_manim_or_python_traceback(tb_text: str) -> dict[str, str | None]:
     """
     Extract essential info from Manim/Rich or standard Python tracebacks.
 
@@ -91,7 +90,7 @@ def parse_manim_or_python_traceback(tb_text: str) -> Dict[str, Optional[str]]:
     """
     text = tb_text.strip("\n")
 
-    frames: list[Tuple[str, int, Optional[str]]] = []
+    frames: list[tuple[str, int, str | None]] = []
 
     # Pattern A: Manim/Rich style: '/path/to/file.py:123 in construct'
     rich_pat = re.compile(
@@ -156,7 +155,7 @@ def parse_manim_or_python_traceback(tb_text: str) -> Dict[str, Optional[str]]:
     }
 
 
-def format_error_for_llm(err: Dict[str, Optional[str]]) -> str:
+def format_error_for_llm(err: dict[str, str | None]) -> str:
     """
     Minimal, structured text for LLM input (includes the exact source line).
     """

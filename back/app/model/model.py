@@ -1,9 +1,9 @@
-import os
 import datetime
-from typing import Optional
-from sqlalchemy import create_engine, Column, Integer, String, TIMESTAMP, ForeignKey, func, event, Engine, UUID
-from sqlalchemy.orm import sessionmaker, relationship, scoped_session
+import os
+
+from sqlalchemy import TIMESTAMP, UUID, Column, Engine, ForeignKey, Integer, String, create_engine, event
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship, scoped_session, sessionmaker
 
 # --- データベース設定 (DB非依存) ---
 
@@ -28,7 +28,7 @@ if not DATABASE_URL:
     print(f"WARNING: DATABASE_URL not set. Using default SQLite database: {DATABASE_URL}")
 else:
     IS_SQLITE = "sqlite" in DATABASE_URL.lower()
-    print(f"Using DATABASE_URL from environment.")
+    print("Using DATABASE_URL from environment.")
 
 
 # SQLAlchemyのベースクラス
@@ -210,7 +210,7 @@ class VideoDatabase:
         finally:
             session.close()
 
-    def edit_video(self, prior_video_id: int, new_video_path: str, new_video_id: str) -> Optional[int]:
+    def edit_video(self, prior_video_id: int, new_video_path: str, new_video_id: str) -> int | None:
         """編集された動画を新たにDBに保存する処理
 
         既存の動画IDをもとに、新たに生成された動画ファイルのパスを受け取り、DBに保存する。
@@ -251,7 +251,7 @@ class VideoDatabase:
 
     # --- ここから追加 ---
 
-    def get_video(self, video_id: int) -> Optional[Video]:
+    def get_video(self, video_id: int) -> Video | None:
         """指定されたvideo_IDのVideoオブジェクトを取得する処理"""
         session = self._get_session()
         try:
@@ -263,7 +263,7 @@ class VideoDatabase:
         finally:
             session.close()
 
-    def get_prompt(self, prompt_id: int) -> Optional[Prompt]:
+    def get_prompt(self, prompt_id: int) -> Prompt | None:
         """指定されたprompt_IDのPromptオブジェクトを取得する処理"""
         session = self._get_session()
         try:
@@ -275,7 +275,7 @@ class VideoDatabase:
         finally:
             session.close()
 
-    def get_manim_code(self, manim_code_id: int) -> Optional[ManimCode]:
+    def get_manim_code(self, manim_code_id: int) -> ManimCode | None:
         """指定されたmanim_code_IDのManimCodeオブジェクトを取得する処理"""
         session = self._get_session()
         try:
@@ -417,7 +417,7 @@ class VideoDatabase:
 # --- FastAPI 依存性注入のための設定 ---
 # (元のコードから変更なし)
 
-_video_db_instance: Optional[VideoDatabase] = None
+_video_db_instance: VideoDatabase | None = None
 
 
 def get_video_db() -> VideoDatabase:

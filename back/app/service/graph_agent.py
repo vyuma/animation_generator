@@ -1,10 +1,10 @@
-from langchain_core.prompts import PromptTemplate
-from langchain_core.runnables import RunnableSequence, RunnablePassthrough
-from langchain_core.output_parsers import StrOutputParser
-from langgraph.graph import StateGraph, END
-
 # LangGraphのコンポーネント
-from typing import TypedDict, Literal
+from typing import Literal, TypedDict
+
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import PromptTemplate
+from langchain_core.runnables import RunnablePassthrough
+from langgraph.graph import END, StateGraph
 
 from app.service.base_agent import BaseManimAgent
 
@@ -253,7 +253,7 @@ class ManimGraphAnimationService(BaseManimAgent):
             return "bad_request"
 
         if final_state["last_error"]:
-            self.base_logger.error(f"--- Graph Finished: Error (Max Retries Reached) ---")
+            self.base_logger.error("--- Graph Finished: Error (Max Retries Reached) ---")
             return "error"
 
         if not final_state["last_error"] and not final_state["is_bad_request"]:
@@ -287,7 +287,7 @@ class ManimGraphAnimationService(BaseManimAgent):
             return "bad_request"
 
         if final_state["last_error"]:
-            self.base_logger.error(f"--- Graph Finished: Error (Max Retries Reached) ---")
+            self.base_logger.error("--- Graph Finished: Error (Max Retries Reached) ---")
             return "error"
 
         if not final_state["last_error"] and not final_state["is_bad_request"]:
