@@ -59,6 +59,13 @@ class PlanResponse(BaseModel):
 
 class BaseManimAgent(ABC):
     def __init__(self, prompt_path: str = "prompt/prompts.toml"):
+        
+        
+        # ログの読み込み
+        self.log_path = Path(os.getenv("LOGS_PATH"))
+        self.manim_scripts_path = Path(os.getenv("MANIM_SCRIPTS_PATH"))
+        self.video_output_path = Path(os.getenv("VIDEO_OUTPUT_PATH"))
+        self.user_instruction_path = Path(os.getenv("USER_INSTRUCTION_PATH"))
         # ログのセットアップ
         self.base_logger = self._setup_logger(logger_name=self.__class__.__name__)
         self.diff_patcher = DiffPatcher(self.base_logger)
@@ -74,10 +81,7 @@ class BaseManimAgent(ABC):
         # ローカル関数のpath関連
         self.workspace_path = Path(os.getenv("WORKSPACE_PATH"))
         
-        self.log_path = Path(os.getenv("LOGS_PATH"))
-        self.manim_scripts_path = Path(os.getenv("MANIM_SCRIPTS_PATH"))
-        self.video_output_path = Path(os.getenv("VIDEO_OUTPUT_PATH"))
-        self.user_instruction_path = Path(os.getenv("USER_INSTRUCTION_PATH"))
+        
         
         # pathが存在しない場合には作成する
         for path in [
@@ -294,12 +298,13 @@ class BaseManimAgent(ABC):
 
         manimスクリプトが正常に実行される。
         """
-        tmp_path = self._save_script(video_id, script)
+        script_path = self._save_script(video_id, script)
 
         try:
             result = subprocess.run(
-                ["manim", "--silent", "-v", "error", "--quality","--progress_bar","none",
-                "--media_dir", f"{self.video_output_path}", "low", str(tmp_path), "GeneratedScene"],
+                ["manim", "--silent", "-v", "error", "--progress_bar","none",
+                "--media_dir", f"{self.video_output_path}","--quality", "l", 
+                str(script_path), "GeneratedScene"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -309,10 +314,10 @@ class BaseManimAgent(ABC):
             # stdout/stderrをログファイルに保存
             self._save_subprocess_logs(video_id, result.stdout, result.stderr)
 
-            self.base_logger.info(f"Script executed successfully: {tmp_path}")
+            self.base_logger.info(f"Script executed successfully: {script_path}")
             return "Success"
         except FileNotFoundError:
-            self.base_logger.error(f"File not found: {tmp_path}")
+            self.base_logger.error(f"File not found: {script_path}")
             return "FileNotFoundError"
 
         except subprocess.CalledProcessError as e:

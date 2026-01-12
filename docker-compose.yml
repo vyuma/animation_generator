@@ -8,9 +8,10 @@ services:
       - PYTHONUNBUFFERED=1
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/devdb
     volumes:
-      - ./media:/workspaces/app/media
-      - ./prompts:/workspaces/app/prompts
-      - ./tmp:/workspaces/app/tmp
+      - ./media:/workspaces/media
+      - ./prompts:/workspaces/prompts
+      - ./script:/workspaces/script
+      - ./logs:/workspaces/logs
     depends_on:
       - db
     restart: unless-stopped

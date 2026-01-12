@@ -31,6 +31,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     texlive-full texlive-lang-cjk && \
     rm -rf /var/lib/apt/lists/*
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    dvisvgm \
+    && rm -rf /var/lib/apt/lists/*
+
 # ffmpeg 静的バイナリのインストール
 RUN wget -q https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz \
     && tar xf ffmpeg-git-amd64-static.tar.xz \
@@ -55,8 +59,9 @@ RUN uv sync --frozen --no-dev
 ENV PATH="/workspaces/.venv/bin:${PATH}" \
     VIRTUAL_ENV="/workspaces/.venv"
 
+
 # media ディレクトリを作成
-RUN mkdir -p /workspaces/media
+RUN mkdir -p /workspaces/media /workspaces/logs /workspaces/script /workspaces/prompts
 
 # ポート設定
 EXPOSE 8080

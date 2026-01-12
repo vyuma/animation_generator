@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 
+
 from app.service.fast_ai_agent import ManimFastAnimationService
 from app.service.base_agent import SuccessResponse , PlanResponse
 from app.model.model import VideoDatabase, get_video_db
@@ -52,7 +53,7 @@ template_service = TemplateService()
 async def full_generation_animation(
     concept_input: ConceptInput,
     db: VideoDatabase = Depends(get_video_db)
-):
+) -> SuccessResponse:
     """
     動画生成のフルパイプラインを実行する。
     ここで発行した生成IDは基本的にSession IDとしてフロントエンドで保持する
@@ -146,7 +147,7 @@ async def get_animation(
     最終 mp4 が確定パスにない場合でも、サブディレクトリを走査して最新の mp4 を返す。
     """
     # まずは一般的な完成パスを優先的に見る
-    common_path = video_path / video_id / "480p15" / "GeneratedScene.mp4"
+    common_path = video_path / "videos" / video_id /"480p15" / "GeneratedScene.mp4"
     print(common_path)
     if common_path.is_file():
         return FileResponse(common_path, media_type="video/mp4", filename=f"{video_id}.mp4")
