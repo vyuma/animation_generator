@@ -14,6 +14,7 @@ from langchain_openai import ChatOpenAI
 from langdetect import LangDetectException, detect
 from loguru import logger
 from pydantic import BaseModel
+from typing import Optional
 
 from app.tools.diff_patcher import DiffPatcher
 from app.tools.manim_linter import ManimLinter
@@ -45,6 +46,7 @@ class SuccessResponse(BaseModel):
     prompt_path: str | None = None
     manim_code_path: str | None = None
     video_id: str | None = None
+    generation_id: Optional[int] = None
 
 
 class PlanResponse(BaseModel):
@@ -341,12 +343,14 @@ class BaseManimAgent(ABC):
         video_log_dir.mkdir(parents=True, exist_ok=True)
         # 新規作成 ファイルが存在しない場合にはファイル作成して保存
         if not os.path.isfile(video_log_dir / "stdout.log") and not os.path.isfile(video_log_dir / "stderr.log"):
+            self.base_logger.debug(f"Creating new subprocess log files for video_id: {video_id}")   
             with open(video_log_dir / "stdout.log", "w", encoding="utf-8") as f:
                 f.write(stdout or "")
             with open(video_log_dir / "stderr.log", "w", encoding="utf-8") as f:
                 f.write(stderr or "")
         else:
             # 追記モードで保存
+            self.base_logger.debug(f"Appending subprocess logs to existing files for video_id: {video_id}")
             with open(video_log_dir / "stdout.log", mode = "a", encoding="utf-8") as f:
                 f.write("\n\n=== New Execution ===\n\n")
                 f.write(stdout or "")
@@ -523,8 +527,12 @@ class BaseManimAgent(ABC):
         動画生成のメイン関数
         """
         # video_id(DBに保存するためのpathを一意にするためのID)
+        
+        
         video_id = str(uuid.uuid4())
-
+        self.base_logger.info(f"Starting main video generation for generation_id: {generation_id}")
+        self.base_logger.info(f"Video ID: {video_id}")
+        
         # save prompt
         prompt_path = self._save_prompt(generation_id, content, enhance_prompt)
 
