@@ -339,11 +339,20 @@ class BaseManimAgent(ABC):
         """[Helper] subprocessのstdout/stderrをvideo_idごとにログファイルに保存"""
         video_log_dir = self.log_path / video_id
         video_log_dir.mkdir(parents=True, exist_ok=True)
-
-        with open(video_log_dir / "stdout.log", "w", encoding="utf-8") as f:
-            f.write(stdout or "")
-        with open(video_log_dir / "stderr.log", "w", encoding="utf-8") as f:
-            f.write(stderr or "")
+        # 新規作成 ファイルが存在しない場合にはファイル作成して保存
+        if not os.path.isfile(video_log_dir / "stdout.log") and not os.path.isfile(video_log_dir / "stderr.log"):
+            with open(video_log_dir / "stdout.log", "w", encoding="utf-8") as f:
+                f.write(stdout or "")
+            with open(video_log_dir / "stderr.log", "w", encoding="utf-8") as f:
+                f.write(stderr or "")
+        else:
+            # 追記モードで保存
+            with open(video_log_dir / "stdout.log", mode = "a", encoding="utf-8") as f:
+                f.write("\n\n=== New Execution ===\n\n")
+                f.write(stdout or "")
+            with open(video_log_dir / "stderr.log", mode = "a", encoding="utf-8") as f:
+                f.write("\n\n=== New Execution ===\n\n")
+                f.write(stderr or "")
 
         self.base_logger.debug(f"Subprocess logs saved to {video_log_dir}")
 
