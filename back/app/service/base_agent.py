@@ -412,8 +412,6 @@ class BaseManimAgent(ABC):
                 check=True,
                 encoding="utf-8",
             )
-            # stdout/stderrをログファイルに保存
-            self._save_subprocess_logs(video_id, result.stdout, result.stderr)
 
             self.base_logger.info(f"Script executed successfully: {script_path}")
             return "Success"
@@ -422,7 +420,7 @@ class BaseManimAgent(ABC):
             return "FileNotFoundError"
 
         except subprocess.CalledProcessError as e:
-            # エラー時もstdout/stderrをログファイルに保存
+            # エラー時のみstdout/stderrをログファイルに保存
             self._save_subprocess_logs(video_id, e.stdout, e.stderr)
 
             parsed_error = e.stderr
