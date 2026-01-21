@@ -67,13 +67,13 @@ async def full_generation_animation(
         # DB に生成セッションを登録し、生成IDを取得
         generate_id = db.generate_prompt()
 
-        # 生成IDによって計画立案を実行と保存
-        plan_response: PlanResponse = service.plan(
+        # 生成IDによって計画立案を実行と保存（非同期）
+        plan_response: PlanResponse = await service.plan(
             generation_id=generate_id, content=concept_input.text, enhance_prompt=concept_input.additional_instructions
         )
-        
-        # 立案した計画をもとに動画生成を実行
-        response: SuccessResponse = service.main(
+
+        # 立案した計画をもとに動画生成を実行（非同期）
+        response: SuccessResponse = await service.main(
             generation_id=generate_id,
             content=plan_response.plan,
             enhance_prompt=concept_input.additional_instructions,
@@ -106,8 +106,8 @@ async def plan_animation(concept_input: ConceptInput, db: VideoDatabase = Depend
         generate_id = db.generate_prompt()
         print(f"Generated ID: {generate_id}")
 
-        # 生成IDによって計画立案を実行と保存
-        plan_response: PlanResponse = service.plan(
+        # 生成IDによって計画立案を実行と保存（非同期）
+        plan_response: PlanResponse = await service.plan(
             generation_id=generate_id, content=concept_input.text, enhance_prompt=concept_input.additional_instructions
         )
         print(plan_response)
@@ -227,7 +227,7 @@ async def search_animation(search_prompt: SearchPrompt):
 @router.post("/api/animation")
 async def generate_regacy_animation(initial_prompt: InitialPrompt, db: VideoDatabase = Depends(get_video_db)):
     try:
-        response: SuccessResponse = service.main(
+        response: SuccessResponse = await service.main(
             generation_id=initial_prompt.generation_id,
             content=initial_prompt.content,
             enhance_prompt=initial_prompt.enhance_prompt,
@@ -253,7 +253,7 @@ async def generate_regacy_animation(initial_prompt: InitialPrompt, db: VideoData
 @router.post("/api/animation/edit", response_model=SuccessResponse, summary="動画編集API")
 async def edit_video(edit_prompt: EditPrompt, db: VideoDatabase = Depends(get_video_db)):
     try:
-        response: SuccessResponse = service.edit(
+        response: SuccessResponse = await service.edit(
             generation_id=edit_prompt.generation_id,
             prior_video_id=edit_prompt.prior_video_id,
             enhance_prompt=edit_prompt.enhance_prompt,

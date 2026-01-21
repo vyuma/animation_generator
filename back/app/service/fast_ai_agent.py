@@ -1,4 +1,5 @@
 # LangGraphのコンポーネント
+import asyncio
 from typing import Literal, TypedDict
 
 from langchain_core.output_parsers import StrOutputParser
@@ -46,7 +47,7 @@ class ManimFastAnimationService(BaseManimAgent):
         """
         return self.get_prompt_by_lang(section, key, lang=self._current_language)
 
-    def _generate_script_with_prompt(self, animation_plan: str) -> str:
+    async def _generate_script_with_prompt(self, animation_plan: str) -> str:
         """
         生成済みのアニメーションプランから Manim スクリプトを生成する関数
         """
@@ -60,20 +61,23 @@ class ManimFastAnimationService(BaseManimAgent):
         # プランを instructions として LLM に渡す
         script_chain = manim_script_prompt | self.pro_llm | parser
 
-        script_result = script_chain.invoke({"instructions": animation_plan})
+        # 非同期でLLMを呼び出し
+        script_result = await script_chain.ainvoke({"instructions": animation_plan})
 
         # LLMが出力するマークダウンを削除
         script_result_cleaned = script_result.strip().replace("```python", "").replace("```", "").strip()
 
         return script_result_cleaned
 
-    def _generate_initial_script_edit(self, state: ManimGraphState):
+    async def _generate_initial_script_edit(self, state: ManimGraphState):
         self.base_logger.info("   [+] Edit mode detected. Applying targeted adjustments.")
         prompt_template = self._get_prompt("chain", "fast_ai_edit_initial")
         edit_prompt = PromptTemplate.from_template(prompt_template)
         parser = StrOutputParser()
         chain = edit_prompt | self.pro_llm | parser
-        llm_response = chain.invoke(
+
+        # 非同期でLLMを呼び出し
+        llm_response = await chain.ainvoke(
             {
                 "edit_instructions": state["user_request"],
                 "original_script": state["current_script"],
@@ -98,8 +102,8 @@ class ManimFastAnimationService(BaseManimAgent):
             "error_type": "",
         }
 
-    def _generate_initial_script_generate(self, state: ManimGraphState):
-        script = self._generate_script_with_prompt(state["animation_plan"])
+    async def _generate_initial_script_generate(self, state: ManimGraphState):
+        script = await self._generate_script_with_prompt(state["animation_plan"])
 
         self.base_logger.debug(f"   [+] Initial script generated (length: {len(script)})")
         return {
@@ -107,18 +111,19 @@ class ManimFastAnimationService(BaseManimAgent):
             "current_retry": 0,
         }
 
-    def _generate_initial_script(self, state: ManimGraphState):
+    async def _generate_initial_script(self, state: ManimGraphState):
         """[Node 1] 最初のスクリプトを生成する"""
         self.base_logger.info("--- 1. [Node] Generating Initial Script ---")
 
         if state["mode"] == "edit":
-            return self._generate_initial_script_edit(state)
+            return await self._generate_initial_script_edit(state)
         else:
-            return self._generate_initial_script_generate(state)
+            return await self._generate_initial_script_generate(state)
 
-    def _run_linter_check(self, state: ManimGraphState):
+    async def _run_linter_check(self, state: ManimGraphState):
         self.base_logger.info("--- 2. [Node] Running Manim Linter ---")
-        lint_result = self._check_code_lint(state["current_script"])
+        # Linterは同期的な処理なのでto_threadでラップ
+        lint_result = await asyncio.to_thread(self._check_code_lint, state["current_script"])
         status = lint_result.get("status")
         issue_count = lint_result.get("issue_count", len(lint_result.get("issues", [])))
 
@@ -134,9 +139,10 @@ class ManimFastAnimationService(BaseManimAgent):
         summary = lint_result.get("summary") or ""
         return {"last_error": summary, "error_type": "lint"}
 
-    def _check_bad_request(self, state: ManimGraphState):
+    async def _check_bad_request(self, state: ManimGraphState):
         self.base_logger.info("--- 3. [Node] Checking for Bad Request ---")
-        is_safe = self._check_code_security(state["current_script"])
+        # セキュリティチェックは同期的な処理なのでto_threadでラップ
+        is_safe = await asyncio.to_thread(self._check_code_security, state["current_script"])
         self.base_logger.debug(f"   [+] Code security check: {'Passed' if is_safe else 'Failed'}")
         if not is_safe:
             return {"is_bad_request": True}
@@ -168,7 +174,7 @@ class ManimFastAnimationService(BaseManimAgent):
             "error_type": "runtime",
         }
 
-    def _execute_and_handle_errors(self, state: ManimGraphState):
+    async def _execute_and_handle_errors(self, state: ManimGraphState):
         """[Node 4] スクリプトを実行し、エラーを処理する
         解像度を落とした事前実行 -> 本実行の2段階での実行
         """
@@ -176,21 +182,25 @@ class ManimFastAnimationService(BaseManimAgent):
         script = state["current_script"]
         video_id = state["video_id"]
         self.base_logger.info("--- 4. [Node] Preflight Execution Check ---")
+
+        # 非同期でスクリプト実行
+        preflight_execution = await self._execute_script_low_res_async(script, video_id)
         preflight_result = self._handle_execution_result(
-            self._execute_script_low_res(script, video_id),
+            preflight_execution,
             stage="Preflight execution",
         )
         if preflight_result["error_type"]:
             return preflight_result
 
         self.base_logger.info("--- 4. [Node] Executing Manim ---")
+        runtime_execution = await self._execute_script_async(script, video_id)
         runtime_result = self._handle_execution_result(
-            self._execute_script(script, video_id),
+            runtime_execution,
             stage="Runtime execution",
         )
         return runtime_result
 
-    def _refine_script_on_error(self, state: ManimGraphState):
+    async def _refine_script_on_error(self, state: ManimGraphState):
         """[Node 5] エラーに基づきスクリプトを修正"""
         self.base_logger.info(f"--- 5. [Node] Refining Script (Attempt {state['current_retry'] + 1}) ---")
 
@@ -207,7 +217,8 @@ class ManimFastAnimationService(BaseManimAgent):
             self.base_logger.debug("   [+] Using pro_llm for subsequent refinements.")
             chain = repair_prompt | self.pro_llm | parser
 
-        fixed_script_response = chain.invoke(
+        # 非同期でLLMを呼び出し
+        fixed_script_response = await chain.ainvoke(
             {
                 "lint_summary": state["last_error"],
                 "original_script": state["current_script"],
@@ -296,10 +307,10 @@ class ManimFastAnimationService(BaseManimAgent):
         return workflow
 
     # ============================================================
-    # ==================   Public APIs (same)   ==================
+    # ==================   Public APIs (async)   =================
     # ============================================================
 
-    def generate_video(
+    async def generate_video(
         self,
         video_id: str,
         content: str,
@@ -307,7 +318,7 @@ class ManimFastAnimationService(BaseManimAgent):
         maxloop: int = 3,
     ) -> str:
         """
-        動画生成のメイン関数
+        動画生成のメイン関数（非同期版）
         """
         # ユーザー入力から言語を検出してインスタンスに保存
         self._current_language = self._detect_language(content)
@@ -327,7 +338,8 @@ class ManimFastAnimationService(BaseManimAgent):
             "mode": "generate",
         }
 
-        final_state = self.app.invoke(initial_state)
+        # 非同期でLangGraphを実行
+        final_state = await self.app.ainvoke(initial_state)
 
         if final_state["is_bad_request"]:
             self.base_logger.error("--- Graph Finished: Bad Request ---")
@@ -344,7 +356,7 @@ class ManimFastAnimationService(BaseManimAgent):
         self.base_logger.critical("--- Graph Finished: Fallback (Unknown State) ---")
         return "fall back"
 
-    def edit_video(
+    async def edit_video(
         self,
         video_id: str,
         original_script: str,
@@ -352,7 +364,7 @@ class ManimFastAnimationService(BaseManimAgent):
         maxloop: int = 3,
     ) -> str:
         """
-        既存のスクリプトを編集して動画を生成するメイン関数
+        既存のスクリプトを編集して動画を生成するメイン関数（非同期版）
         """
         # 編集指示から言語を検出してインスタンスに保存
         self._current_language = self._detect_language(edit_instructions)
@@ -372,7 +384,8 @@ class ManimFastAnimationService(BaseManimAgent):
             "mode": "edit",
         }
 
-        final_state = self.app.invoke(initial_state)
+        # 非同期でLangGraphを実行
+        final_state = await self.app.ainvoke(initial_state)
 
         if final_state["is_bad_request"]:
             self.base_logger.error("--- Graph Finished: Bad Request ---")
@@ -389,9 +402,9 @@ class ManimFastAnimationService(BaseManimAgent):
         self.base_logger.critical("--- Graph Finished: Fallback (Unknown State) ---")
         return "fall back"
 
-    def manim_planner(self, content: str, enhance_prompt: str) -> str:
+    async def manim_planner(self, content: str, enhance_prompt: str) -> str:
         """
-        Manimのアニメーションプランを生成する関数
+        Manimのアニメーションプランを生成する関数（非同期版）
         ユーザー入力 (content) から言語を自動検出してプロンプトを選択する
         """
         # 言語を検出してインスタンスに保存
@@ -407,6 +420,7 @@ class ManimFastAnimationService(BaseManimAgent):
 
         chain = manim_planer | self.lite_llm | parser
 
-        output: str = chain.invoke({"user_prompt": content, "video_enhance_prompt": enhance_prompt})
+        # 非同期でLLMを呼び出し
+        output: str = await chain.ainvoke({"user_prompt": content, "video_enhance_prompt": enhance_prompt})
         self.base_logger.info(f"Manim planner output: {output}")
         return output
