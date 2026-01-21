@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import subprocess
@@ -443,8 +444,16 @@ class BaseManimAgent(ABC):
             self.base_logger.error(f"Script execution failed: {parsed_error}")
             return parsed_error
 
+    async def _execute_script_low_res_async(self, script: str, video_id: str) -> str:
+        """[Helper] 最低解像度での実行チェック（非同期版）"""
+        return await asyncio.to_thread(self._execute_script_low_res, script, video_id)
+
+    async def _execute_script_async(self, script: str, video_id: str) -> str:
+        """[Helper] manimスクリプトの実行（非同期版）"""
+        return await asyncio.to_thread(self._execute_script, script, video_id)
+
     @abstractmethod
-    def manim_planner(self, content: str, enhance_prompt: str = "") -> str:
+    async def manim_planner(self, content: str, enhance_prompt: str = "") -> str:
         """
         manimコード生成のための計画立案
 
@@ -464,9 +473,9 @@ class BaseManimAgent(ABC):
         pass
 
     @abstractmethod
-    def generate_video(self, video_id: str, content: str, enhance_prompt: str, maxloop: int = 3) -> str:
+    async def generate_video(self, video_id: str, content: str, enhance_prompt: str, maxloop: int = 3) -> str:
         """
-        サブクラスで実装されるべき抽象的なメソッド
+        サブクラスで実装されるべき抽象的なメソッド（非同期版）
 
         このコードの中には動画生成のために必要なロジックを実装する。
         このメソッドの中では、
@@ -486,9 +495,9 @@ class BaseManimAgent(ABC):
         pass
 
     @abstractmethod
-    def edit_video(self, new_video_id: str, script: str, enhance_prompt: str, max_loop: int = 3) -> str:
+    async def edit_video(self, new_video_id: str, script: str, enhance_prompt: str, max_loop: int = 3) -> str:
         """
-        サブクラスで実装されるべき抽象的なメソッド
+        サブクラスで実装されるべき抽象的なメソッド（非同期版）
 
         このコードの中には動画編集のために必要なロジックを実装する。
         このメソッドの中では、
@@ -506,14 +515,14 @@ class BaseManimAgent(ABC):
         """
         pass
 
-    def plan(self, generation_id, content: str, enhance_prompt: str = "") -> str:
+    async def plan(self, generation_id, content: str, enhance_prompt: str = "") -> PlanResponse:
         """
-        manimコード生成のための計画立案の共通関数
+        manimコード生成のための計画立案の共通関数（非同期版）
         """
         try:
             prompt_path = self._save_prompt(generation_id, content, enhance_prompt)
-            plan = self.manim_planner(content, enhance_prompt)
-            prompt_path: Path = self._save_prompt(generation_id, plan, enhance_prompt)
+            plan = await self.manim_planner(content, enhance_prompt)
+            prompt_path = self._save_prompt(generation_id, plan, enhance_prompt)
             self.base_logger.info(f"Plan generated: {generation_id}")
             self.base_logger.debug(f"Plan details: {prompt_path}")
 
@@ -523,21 +532,19 @@ class BaseManimAgent(ABC):
             self.base_logger.error(f"Error in plan: {e}")
             return PlanResponse(plan="", generation_id=None)
 
-    def main(self, generation_id, content: str, enhance_prompt: str, max_loop: int = 3) -> SuccessResponse:
+    async def main(self, generation_id, content: str, enhance_prompt: str, max_loop: int = 3) -> SuccessResponse:
         """
-        動画生成のメイン関数
+        動画生成のメイン関数（非同期版）
         """
         # video_id(DBに保存するためのpathを一意にするためのID)
-        
-        
         video_id = str(uuid.uuid4())
         self.base_logger.info(f"Starting main video generation for generation_id: {generation_id}")
         self.base_logger.info(f"Video ID: {video_id}")
-        
+
         # save prompt
         prompt_path = self._save_prompt(generation_id, content, enhance_prompt)
 
-        is_success = self.generate_video(video_id, content, enhance_prompt, max_loop)
+        is_success = await self.generate_video(video_id, content, enhance_prompt, max_loop)
 
         if is_success == "Success":
             return SuccessResponse(
@@ -561,12 +568,15 @@ class BaseManimAgent(ABC):
                 message="failed",
             )
 
-    def edit(self, generation_id: int, prior_video_id: str, enhance_prompt: str, max_loop: int = 3):
+    async def edit(self, generation_id: int, prior_video_id: str, enhance_prompt: str, max_loop: int = 3) -> SuccessResponse:
+        """
+        動画編集の共通関数（非同期版）
+        """
         script = self._get_script(prior_video_id)
 
         new_video_id = str(uuid.uuid4())
         prompt_path = self._save_prompt(generation_id, "", enhance_prompt)
-        is_success = self.edit_video(new_video_id, script, enhance_prompt, max_loop)
+        is_success = await self.edit_video(new_video_id, script, enhance_prompt, max_loop)
 
         if is_success == "Success":
             return SuccessResponse(

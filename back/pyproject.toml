@@ -38,6 +38,7 @@ dependencies = [
     "torch==2.9.0+cpu",
     "transformers>=4.57.1",
     "uvicorn>=0.37.0",
+    "sse-starlette>=2.0.0",
 ]
 
 [tool.uv.sources]

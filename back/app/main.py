@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.router import animation
+from app.router import animation, job
 
 app = FastAPI(
     title="AI Agent Backend",
@@ -26,6 +26,7 @@ def root():
 
 # ルーター登録
 app.include_router(animation.router)
+app.include_router(job.router)
 
 
 if __name__ == "__main__":
