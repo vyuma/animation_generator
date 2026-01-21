@@ -58,7 +58,7 @@ class BaseManimAgent(ABC):
     # 対応言語リスト（新しい言語を追加する場合はここに追加）
     SUPPORTED_LANGUAGES = ["ja", "en"]
 
-    def __init__(self, prompt_dir: str = "prompt"):
+    def __init__(self, prompt_dir: str, base_prompt_file_name: str ):
         # Pathの設定
         self.log_path = Path(os.getenv("LOGS_PATH"))
         self.manim_scripts_path = Path(os.getenv("MANIM_SCRIPTS_PATH"))
@@ -71,6 +71,7 @@ class BaseManimAgent(ABC):
         self.DEFAULT_LANGUAGE = os.getenv("DEFAULT_LANGUAGE")
         # プロンプトの読み込み（多言語対応）
         self.prompt_dir = prompt_dir
+        self.base_prompt_file_name = base_prompt_file_name
         self.prompts = self._load_all_prompts(prompt_dir=prompt_dir)
         # LLMの初期化
         self.pro_llm = self._load_llm("gemini-3-pro-preview")
@@ -137,7 +138,7 @@ class BaseManimAgent(ABC):
 
             all_prompts[lang] = {}
             # 言語ディレクトリ内の全.tomlファイルを読み込む
-            for toml_file in lang_dir.glob("*.toml"):
+            for toml_file in lang_dir.glob(f"{self.base_prompt_file_name}.toml"):
                 with open(toml_file, "rb") as f:
                     data = tomllib.load(f)
                     # 各tomlファイルの内容をマージ

@@ -32,8 +32,8 @@ class ManimGraphState(TypedDict):
 
 
 class ManimFastAnimationService(BaseManimAgent):
-    def __init__(self, prompt_dir: str = "prompt"):
-        super().__init__(prompt_dir)
+    def __init__(self, prompt_dir: str, base_prompt_file_name: str = "fast_ai_prompts"):
+        super().__init__(prompt_dir, base_prompt_file_name=base_prompt_file_name)
         self._current_language: str = self.DEFAULT_LANGUAGE
         # --- LangGraph のグラフを構築 ---
         self.workflow = self._build_graph()

@@ -3,7 +3,7 @@ services:
     build: .
     container_name: animation-ai-agent-backend
     ports:
-      - "8080:8080"
+      - "8888:8888"
     environment:
       - PYTHONUNBUFFERED=1
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/devdb

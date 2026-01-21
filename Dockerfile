@@ -67,4 +67,4 @@ RUN mkdir -p /workspaces/media /workspaces/logs /workspaces/script /workspaces/p
 EXPOSE 8080
 
 # uvicorn でサーバー起動
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8888"]

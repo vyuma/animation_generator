@@ -48,7 +48,10 @@ class SearchPrompt(BaseModel):
 
 # ---------- Service ----------
 # service = ManimGraphAnimationService()
-service = ManimFastAnimationService()
+service = ManimFastAnimationService(
+    prompt_dir="prompt",
+    base_prompt_file_name="fast_ai_prompts"
+)
 template_service = TemplateService()
 
 
