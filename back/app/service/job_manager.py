@@ -198,8 +198,13 @@ class JobManager:
 
     def _notify_subscribers(self, job_id: str, event: str, data: dict) -> None:
         """購読者に通知（非同期キューに送信）"""
+        # Lock内でsubscribersのコピーを取得し、Lock外でQueue操作を行う
+        # これにより、asyncioのイベントループをブロックしない
         with self._job_lock:
-            subscribers = self._subscribers.get(job_id, [])
+            subscribers = list(self._subscribers.get(job_id, []))
+
+        if not subscribers:
+            return
 
         sse_event = SSEEvent(event=event, data=data)
         for queue in subscribers:
