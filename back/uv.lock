@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -321,7 +321,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.118.2" },
     { name = "google-cloud-aiplatform", specifier = ">=1.124.0" },
     { name = "json-repair", specifier = ">=0.52.0" },
-    { name = "langchain", specifier = ">=0.3.27" },
+    { name = "langchain", specifier = ">=1.0.0" },
     { name = "langchain-anthropic", specifier = ">=0.3.21" },
     { name = "langchain-chroma", specifier = ">=0.2.6" },
     { name = "langchain-community", specifier = ">=0.3.31" },
