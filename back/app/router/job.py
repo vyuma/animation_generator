@@ -61,15 +61,13 @@ async def _run_edit_job(
         )
 
         # 編集処理を実行（非同期）
-        job_manager.update_progress(
-            job_id, 0.2, JobStep.GENERATING_SCRIPT, "Generating edit script..."
-        )
-
+        # 詳細な進捗はservice.edit内で更新される
         response: SuccessResponse = await service.edit(
             generation_id=generation_id,
             prior_video_id=prior_video_id,
             enhance_prompt=enhance_prompt,
             max_loop=3,
+            job_id=job_id,
         )
 
         # 成功した場合はDBに保存
@@ -126,16 +124,14 @@ async def _run_full_generation_job(
             enhance_prompt=additional_instructions,
         )
 
-        job_manager.update_progress(
-            job_id, 0.3, JobStep.GENERATING_SCRIPT, "Generating Manim script..."
-        )
-
         # 動画生成（非同期）
+        # 詳細な進捗はservice.main内で更新される
         response: SuccessResponse = await service.main(
             generation_id=generate_id,
             content=plan_response.plan,
             enhance_prompt=additional_instructions,
             max_loop=3,
+            job_id=job_id,
         )
 
         # 成功した場合はDBに保存

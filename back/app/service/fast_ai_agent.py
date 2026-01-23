@@ -6,7 +6,9 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
 from langgraph.graph import END, StateGraph
 
+from app.model.job import JobStep
 from app.service.base_agent import BaseManimAgent
+from app.service.job_manager import job_manager
 
 
 class ManimGraphState(TypedDict):
@@ -31,6 +33,9 @@ class ManimGraphState(TypedDict):
     current_retry: int  # 現在の試行回数 (元の loop)
     mode: Literal["generate", "edit"]  # 動作モード
 
+    # --- ジョブ管理用（オプション） ---
+    job_id: str  # ジョブID（進捗更新用、空文字の場合は更新しない）
+
 
 class ManimFastAnimationService(BaseManimAgent):
     def __init__(self, prompt_dir: str, base_prompt_file_name: str = "fast_ai_prompts"):
@@ -39,6 +44,21 @@ class ManimFastAnimationService(BaseManimAgent):
         # --- LangGraph のグラフを構築 ---
         self.workflow = self._build_graph()
         self.app = self.workflow.compile()
+
+    def _update_job_progress(
+        self,
+        state: ManimGraphState,
+        progress: float,
+        step: JobStep,
+        message: str,
+    ) -> None:
+        """
+        ジョブの進捗を更新するヘルパーメソッド
+        job_idが空の場合は何もしない（後方互換性のため）
+        """
+        job_id = state.get("job_id", "")
+        if job_id:
+            job_manager.update_progress(job_id, progress, step, message)
 
     def _get_prompt(self, section: str, key: str) -> str:
         """
@@ -114,6 +134,7 @@ class ManimFastAnimationService(BaseManimAgent):
     async def _generate_initial_script(self, state: ManimGraphState):
         """[Node 1] 最初のスクリプトを生成する"""
         self.base_logger.info("--- 1. [Node] Generating Initial Script ---")
+        self._update_job_progress(state, 0.35, JobStep.GENERATING_SCRIPT, "Generating initial script...")
 
         if state["mode"] == "edit":
             return await self._generate_initial_script_edit(state)
@@ -122,6 +143,7 @@ class ManimFastAnimationService(BaseManimAgent):
 
     async def _run_linter_check(self, state: ManimGraphState):
         self.base_logger.info("--- 2. [Node] Running Manim Linter ---")
+        self._update_job_progress(state, 0.50, JobStep.LINTING, "Running linter check...")
         # Linterは同期的な処理なのでto_threadでラップ
         lint_result = await asyncio.to_thread(self._check_code_lint, state["current_script"])
         status = lint_result.get("status")
@@ -141,6 +163,7 @@ class ManimFastAnimationService(BaseManimAgent):
 
     async def _check_bad_request(self, state: ManimGraphState):
         self.base_logger.info("--- 3. [Node] Checking for Bad Request ---")
+        self._update_job_progress(state, 0.55, JobStep.SECURITY_CHECK, "Running security check...")
         # セキュリティチェックは同期的な処理なのでto_threadでラップ
         is_safe = await asyncio.to_thread(self._check_code_security, state["current_script"])
         self.base_logger.debug(f"   [+] Code security check: {'Passed' if is_safe else 'Failed'}")
@@ -182,6 +205,7 @@ class ManimFastAnimationService(BaseManimAgent):
         script = state["current_script"]
         video_id = state["video_id"]
         self.base_logger.info("--- 4. [Node] Preflight Execution Check ---")
+        self._update_job_progress(state, 0.60, JobStep.PREFLIGHT, "Running preflight check...")
 
         # 非同期でスクリプト実行
         preflight_execution = await self._execute_script_low_res_async(script, video_id)
@@ -193,6 +217,7 @@ class ManimFastAnimationService(BaseManimAgent):
             return preflight_result
 
         self.base_logger.info("--- 4. [Node] Executing Manim ---")
+        self._update_job_progress(state, 0.70, JobStep.EXECUTING, "Executing Manim script...")
         runtime_execution = await self._execute_script_async(script, video_id)
         runtime_result = self._handle_execution_result(
             runtime_execution,
@@ -203,6 +228,10 @@ class ManimFastAnimationService(BaseManimAgent):
     async def _refine_script_on_error(self, state: ManimGraphState):
         """[Node 5] エラーに基づきスクリプトを修正"""
         self.base_logger.info(f"--- 5. [Node] Refining Script (Attempt {state['current_retry'] + 1}) ---")
+        retry_num = state["current_retry"] + 1
+        self._update_job_progress(
+            state, 0.45, JobStep.REFINING, f"Refining script (attempt {retry_num})..."
+        )
 
         prompt_template = self._get_prompt("chain", "fast_ai_refine_patch")
         repair_prompt = PromptTemplate.from_template(prompt_template)
@@ -316,9 +345,13 @@ class ManimFastAnimationService(BaseManimAgent):
         content: str,
         enhance_prompt: str,
         maxloop: int = 3,
+        job_id: str = "",
     ) -> str:
         """
         動画生成のメイン関数（非同期版）
+
+        Args:
+            job_id: ジョブID（オプション）。指定すると各ノードで進捗が更新される
         """
         # ユーザー入力から言語を検出してインスタンスに保存
         self._current_language = self._detect_language(content)
@@ -336,6 +369,7 @@ class ManimFastAnimationService(BaseManimAgent):
             "max_retries": maxloop,
             "current_retry": 0,
             "mode": "generate",
+            "job_id": job_id,
         }
 
         # 非同期でLangGraphを実行
@@ -362,9 +396,13 @@ class ManimFastAnimationService(BaseManimAgent):
         original_script: str,
         edit_instructions: str,
         maxloop: int = 3,
+        job_id: str = "",
     ) -> str:
         """
         既存のスクリプトを編集して動画を生成するメイン関数（非同期版）
+
+        Args:
+            job_id: ジョブID（オプション）。指定すると各ノードで進捗が更新される
         """
         # 編集指示から言語を検出してインスタンスに保存
         self._current_language = self._detect_language(edit_instructions)
@@ -382,6 +420,7 @@ class ManimFastAnimationService(BaseManimAgent):
             "max_retries": maxloop,
             "current_retry": 0,
             "mode": "edit",
+            "job_id": job_id,
         }
 
         # 非同期でLangGraphを実行

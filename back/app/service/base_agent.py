@@ -825,7 +825,9 @@ class BaseManimAgent(ABC):
         pass
 
     @abstractmethod
-    async def generate_video(self, video_id: str, content: str, enhance_prompt: str, maxloop: int = 3) -> str:
+    async def generate_video(
+        self, video_id: str, content: str, enhance_prompt: str, maxloop: int = 3, job_id: str = ""
+    ) -> str:
         """
         サブクラスで実装されるべき抽象的なメソッド（非同期版）
 
@@ -834,6 +836,7 @@ class BaseManimAgent(ABC):
         video_id: 動画の一意な識別子
         content: manimコード生成のための計画立案（planであることに注意する）
         enhance_prompt:動画作成をするための追加プロンプト
+        job_id: ジョブID（オプション）。指定すると進捗が更新される
 
         を受け取る。
 
@@ -847,7 +850,9 @@ class BaseManimAgent(ABC):
         pass
 
     @abstractmethod
-    async def edit_video(self, new_video_id: str, script: str, enhance_prompt: str, max_loop: int = 3) -> str:
+    async def edit_video(
+        self, new_video_id: str, script: str, enhance_prompt: str, max_loop: int = 3, job_id: str = ""
+    ) -> str:
         """
         サブクラスで実装されるべき抽象的なメソッド（非同期版）
 
@@ -884,9 +889,14 @@ class BaseManimAgent(ABC):
             self.base_logger.error(f"Error in plan: {e}")
             return PlanResponse(plan="", generation_id=None)
 
-    async def main(self, generation_id, content: str, enhance_prompt: str, max_loop: int = 3) -> SuccessResponse:
+    async def main(
+        self, generation_id, content: str, enhance_prompt: str, max_loop: int = 3, job_id: str = ""
+    ) -> SuccessResponse:
         """
         動画生成のメイン関数（非同期版）
+
+        Args:
+            job_id: ジョブID（オプション）。指定すると各処理ステップで進捗が更新される
         """
         # セッション開始時にトークン使用量をリセット
         self.reset_token_usage()
@@ -899,7 +909,7 @@ class BaseManimAgent(ABC):
         # save prompt
         prompt_path = self._save_prompt(generation_id, content, enhance_prompt)
 
-        is_success = await self.generate_video(video_id, content, enhance_prompt, max_loop)
+        is_success = await self.generate_video(video_id, content, enhance_prompt, max_loop, job_id)
 
         # セッション終了時にトークン使用量サマリーをログ出力
         self.log_token_summary()
@@ -932,9 +942,14 @@ class BaseManimAgent(ABC):
                 token_cost=token_cost,
             )
 
-    async def edit(self, generation_id: int, prior_video_id: str, enhance_prompt: str, max_loop: int = 3) -> SuccessResponse:
+    async def edit(
+        self, generation_id: int, prior_video_id: str, enhance_prompt: str, max_loop: int = 3, job_id: str = ""
+    ) -> SuccessResponse:
         """
         動画編集の共通関数（非同期版）
+
+        Args:
+            job_id: ジョブID（オプション）。指定すると各処理ステップで進捗が更新される
         """
         # セッション開始時にトークン使用量をリセット
         self.reset_token_usage()
@@ -943,7 +958,7 @@ class BaseManimAgent(ABC):
 
         new_video_id = str(uuid.uuid4())
         prompt_path = self._save_prompt(generation_id, "", enhance_prompt)
-        is_success = await self.edit_video(new_video_id, script, enhance_prompt, max_loop)
+        is_success = await self.edit_video(new_video_id, script, enhance_prompt, max_loop, job_id)
 
         # セッション終了時にトークン使用量サマリーをログ出力
         self.log_token_summary()
