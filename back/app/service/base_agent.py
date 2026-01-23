@@ -380,7 +380,7 @@ class BaseManimAgent(ABC):
         # トークン追跡機能の初期化（LLM初期化より前に必要）
         self._token_tracker = TokenUsageTracker(self.base_logger)
         # LLMの初期化（コールバック付きで返される）
-        self.pro_llm = self._load_llm("gemini-3-pro-preview")
+        self.pro_llm = self._load_llm("gemini-3-flash-preview") # 本来はGemini-3-pro-previewを使用するがコスト削減のため変更
         self.flash_llm = self._load_llm("gemini-3-flash-preview")
         self.lite_llm = self._load_llm("gemini-3-flash-preview")
         self.manim_linter = ManimLinter()
