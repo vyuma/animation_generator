@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 
@@ -18,6 +19,7 @@ router = APIRouter(tags=["animation"])
 
 script_path = Path(os.getenv("MANIM_SCRIPTS_PATH"))
 video_path = Path(os.getenv("VIDEO_OUTPUT_PATH"))
+user_instruction_path = Path(os.getenv("USER_INSTRUCTION_PATH"))
 
 
 # ---------- Pydantic Models ----------
@@ -44,6 +46,39 @@ class EditPrompt(BaseModel):
 
 class SearchPrompt(BaseModel):
     content: str
+
+
+class VideoInfo(BaseModel):
+    """動画情報のレスポンスモデル"""
+    video_id: str
+    video_path: str | None
+    edit_count: int
+    generate_time: str | None
+
+    class Config:
+        from_attributes = True
+
+
+class GenerationSessionResponse(BaseModel):
+    """generation_idに紐づくセッション情報のレスポンスモデル"""
+    generation_id: int
+    generate_time: str | None
+    videos: list[VideoInfo]
+    latest_video_id: str | None  # 最新の編集動画ID
+
+
+class PromptHistoryItem(BaseModel):
+    """プロンプト履歴の各項目"""
+    trial: int
+    content: str
+    enhance_prompt: str
+
+
+class PromptHistoryResponse(BaseModel):
+    """generation_idに紐づくプロンプト履歴のレスポンスモデル"""
+    generation_id: int
+    prompts: list[PromptHistoryItem]
+    latest_prompt: PromptHistoryItem | None
 
 
 # ---------- Service ----------
@@ -269,3 +304,122 @@ async def edit_video(edit_prompt: EditPrompt, db: VideoDatabase = Depends(get_vi
     except Exception as e:
         # サービス内例外は 500 で返却
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/generation/{generation_id}", response_model=GenerationSessionResponse, summary="セッション情報取得API")
+async def get_generation_session(generation_id: int, db: VideoDatabase = Depends(get_video_db)):
+    """
+    generation_id（セッションID）から、編集履歴とvideo_idを含むセッション情報を取得する。
+
+    レスポンス:
+    - generation_id: セッションID
+    - generate_time: セッション作成時刻
+    - videos: このセッションに紐づく動画リスト（edit_count順にソート）
+    - latest_video_id: 最新の編集動画ID
+    """
+    try:
+        # Generationの存在確認
+        session = db._get_session()
+        try:
+            from app.model.model import Generation
+            generation = session.query(Generation).get(generation_id)
+            if not generation:
+                raise HTTPException(status_code=404, detail=f"Generation with id {generation_id} not found")
+
+            generate_time = generation.generate_time.isoformat() if generation.generate_time else None
+        finally:
+            session.close()
+
+        # このgeneration_idに紐づく動画を取得
+        videos = db.get_videos_by_generation(generation_id)
+
+        if not videos:
+            return GenerationSessionResponse(
+                generation_id=generation_id,
+                generate_time=generate_time,
+                videos=[],
+                latest_video_id=None,
+            )
+
+        # edit_count順にソート（編集履歴順）
+        sorted_videos = sorted(videos, key=lambda v: v.edit_count)
+
+        video_info_list = [
+            VideoInfo(
+                video_id=str(v.video_id),
+                video_path=v.video_path,
+                edit_count=v.edit_count,
+                generate_time=v.generate_time.isoformat() if v.generate_time else None,
+            )
+            for v in sorted_videos
+        ]
+
+        # 最新の動画（edit_countが最大のもの）
+        latest_video = sorted_videos[-1]
+
+        return GenerationSessionResponse(
+            generation_id=generation_id,
+            generate_time=generate_time,
+            videos=video_info_list,
+            latest_video_id=str(latest_video.video_id),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get generation session: {str(e)}")
+
+
+@router.get("/api/generation/{generation_id}/prompts", response_model=PromptHistoryResponse, summary="プロンプト履歴取得API")
+async def get_generation_prompts(generation_id: int):
+    """
+    generation_id（セッションID）から、編集に使用されたプロンプトの履歴を取得する。
+
+    レスポンス:
+    - generation_id: セッションID
+    - prompts: プロンプト履歴のリスト（trial順にソート）
+      - trial: 試行番号（1が初回、2以降が編集）
+      - content: プロンプト内容（計画など）
+      - enhance_prompt: 追加の指示
+    - latest_prompt: 最新のプロンプト
+    """
+    try:
+        prompt_file_path = user_instruction_path / f"{generation_id}.json"
+
+        if not prompt_file_path.is_file():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Prompt history for generation_id {generation_id} not found"
+            )
+
+        with open(prompt_file_path, encoding="utf-8") as f:
+            data = json.load(f)
+
+        prompts_data = data.get("prompt", [])
+
+        # データ構造が古い形式の場合の対応
+        if not isinstance(prompts_data, list):
+            prompts_data = [prompts_data] if prompts_data else []
+
+        # trial順にソート
+        sorted_prompts = sorted(prompts_data, key=lambda p: p.get("trial", 0))
+
+        prompt_history_list = [
+            PromptHistoryItem(
+                trial=p.get("trial", 0),
+                content=p.get("content", ""),
+                enhance_prompt=p.get("enhance_prompt", ""),
+            )
+            for p in sorted_prompts
+        ]
+
+        latest_prompt = prompt_history_list[-1] if prompt_history_list else None
+
+        return PromptHistoryResponse(
+            generation_id=generation_id,
+            prompts=prompt_history_list,
+            latest_prompt=latest_prompt,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get prompt history: {str(e)}")
