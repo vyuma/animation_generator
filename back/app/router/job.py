@@ -354,6 +354,9 @@ async def stream_edit_job(
         video_id=request.prior_video_id,
     )
 
+    # SSEサブスクリプションを先に設定（レースコンディション防止）
+    queue = job_manager.subscribe(job_id)
+
     # 別タスクでジョブを実行
     asyncio.create_task(
         _run_edit_job(
@@ -367,20 +370,55 @@ async def stream_edit_job(
 
     async def event_generator():
         """SSEイベントを生成"""
-        async for event in job_manager.stream_job_events(job_id):
-            # datetimeをシリアライズ可能な形式に変換
-            data = event.data.copy()
-            for key in ["created_at", "updated_at"]:
-                if key in data and data[key]:
-                    if isinstance(data[key], datetime):
-                        data[key] = data[key].isoformat()
+        try:
+            # 現在の状態を即座に送信
+            job = job_manager.get_job(job_id)
+            if job:
+                data = job.model_dump()
+                for key in ["created_at", "updated_at"]:
+                    if key in data and data[key]:
+                        if isinstance(data[key], datetime):
+                            data[key] = data[key].isoformat()
+                yield {
+                    "event": "status",
+                    "data": json.dumps(data, ensure_ascii=False),
+                }
 
-            yield {
-                "event": event.event,
-                "data": json.dumps(data, ensure_ascii=False),
-            }
+                if job.status in (JobStatus.COMPLETED, JobStatus.FAILED):
+                    return
 
-    return EventSourceResponse(event_generator())
+            # イベントを待機して送信
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=15.0)
+                    data = event.data.copy()
+                    for key in ["created_at", "updated_at"]:
+                        if key in data and data[key]:
+                            if isinstance(data[key], datetime):
+                                data[key] = data[key].isoformat()
+
+                    yield {
+                        "event": event.event,
+                        "data": json.dumps(data, ensure_ascii=False),
+                    }
+
+                    if event.event in ("completed", "error"):
+                        break
+                except asyncio.TimeoutError:
+                    yield {
+                        "event": "ping",
+                        "data": json.dumps({"timestamp": datetime.now().isoformat()}),
+                    }
+        finally:
+            job_manager.unsubscribe(job_id, queue)
+
+    return EventSourceResponse(
+        event_generator(),
+        headers={
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+        },
+    )
 
 
 @router.get(
