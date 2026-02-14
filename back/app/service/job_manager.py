@@ -238,7 +238,7 @@ class JobManager:
             # イベントを待機して送信
             while True:
                 try:
-                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    event = await asyncio.wait_for(queue.get(), timeout=5.0)
                     yield event
 
                     # 完了または失敗で終了
