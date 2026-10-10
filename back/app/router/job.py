@@ -20,6 +20,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sse_starlette.sse import EventSourceResponse
 
 from app.model.job import (
+    GenerateJobRequest,
     JobCreateRequest,
     JobCreateResponse,
     JobStatus,
@@ -84,6 +85,58 @@ async def _run_edit_job(
         # 完了
         job_manager.complete_job(job_id, {
             "ok": response.ok,
+            "video_id": response.video_id,
+            "video_path": response.video_path,
+            "prompt_path": response.prompt_path,
+            "manim_code_path": response.manim_code_path,
+            "message": response.message,
+        })
+
+    except Exception as e:
+        job_manager.fail_job(job_id, str(e))
+
+
+async def _run_generate_job(
+    job_id: str,
+    generation_id: int,
+    content: str,
+    enhance_prompt: str,
+    db: VideoDatabase,
+) -> None:
+    """
+    承認済みプランから動画を生成するジョブ（非同期版）
+    """
+    try:
+        job_manager.update_progress(
+            job_id, 0.1, JobStep.INITIALIZING, "Starting generation from plan..."
+        )
+
+        response: SuccessResponse = await service.main(
+            generation_id=generation_id,
+            content=content,
+            enhance_prompt=enhance_prompt,
+            max_loop=3,
+            job_id=job_id,
+        )
+
+        if not (response.ok and response.video_id):
+            job_manager.fail_job(job_id, response.message or "Video generation failed.")
+            return
+
+        job_manager.update_progress(
+            job_id, 0.95, JobStep.FINALIZING, "Saving to database..."
+        )
+        db.generate_video(
+            generate_id=generation_id,
+            video_id=response.video_id,
+            video_path=response.video_path,
+            prompt_path=response.prompt_path,
+            manim_code_path=response.manim_code_path,
+        )
+
+        job_manager.complete_job(job_id, {
+            "ok": response.ok,
+            "generation_id": generation_id,
             "video_id": response.video_id,
             "video_path": response.video_path,
             "prompt_path": response.prompt_path,
@@ -214,6 +267,44 @@ async def create_edit_job(
         job_id=job_id,
         status=JobStatus.PENDING,
         message="Edit job created. Poll /api/job/{job_id}/status for progress.",
+    )
+
+
+@router.post(
+    "/animation/generate",
+    response_model=JobCreateResponse,
+    summary="プランから生成するジョブを作成",
+    description="""
+    `/api/plan_animation` で作成・承認したプランから動画生成ジョブを非同期で開始します。
+
+    このエンドポイントは即座にjob_idを返し、進捗は `/api/job/{job_id}/status` または
+    `/api/job/{job_id}/stream` で取得できます。
+    """,
+)
+async def create_generate_job(
+    request: GenerateJobRequest,
+    background_tasks: BackgroundTasks,
+    db: VideoDatabase = Depends(get_video_db),
+) -> JobCreateResponse:
+    """承認済みプランから生成ジョブを作成"""
+    job_id = job_manager.create_job(
+        job_type=JobType.GENERATE,
+        generation_id=request.generation_id,
+    )
+
+    background_tasks.add_task(
+        _run_generate_job,
+        job_id=job_id,
+        generation_id=request.generation_id,
+        content=request.content,
+        enhance_prompt=request.enhance_prompt,
+        db=db,
+    )
+
+    return JobCreateResponse(
+        job_id=job_id,
+        status=JobStatus.PENDING,
+        message="Generate job created.",
     )
 
 

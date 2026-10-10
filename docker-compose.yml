@@ -1,12 +1,23 @@
+# 起動: ルートの .env に GEMINI_API_KEY を書いてから
+#   docker compose up --build
+# フロントエンド: http://localhost:3000 / バックエンド API: http://localhost:8888/docs
 services:
   backend:
     build: .
     container_name: animation-ai-agent-backend
     ports:
       - "8888:8888"
+    env_file:
+      - .env
     environment:
       - PYTHONUNBUFFERED=1
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/devdb
+      # コンテナ内パス（変更不要）
+      - WORKSPACE_PATH=/workspaces/app/
+      - LOGS_PATH=/workspaces/logs
+      - MANIM_SCRIPTS_PATH=/workspaces/script
+      - VIDEO_OUTPUT_PATH=/workspaces/media/
+      - USER_INSTRUCTION_PATH=/workspaces/prompts
     volumes:
       - ./media:/workspaces/media
       - ./prompts:/workspaces/prompts
@@ -14,6 +25,17 @@ services:
       - ./logs:/workspaces/logs
     depends_on:
       - db
+    restart: unless-stopped
+
+  frontend:
+    build: ./front
+    container_name: animation-ai-agent-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - API_URL=http://backend:8888
+    depends_on:
+      - backend
     restart: unless-stopped
 
   db:

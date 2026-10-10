@@ -1,0 +1,302 @@
+@import "tailwindcss";
+@import "katex/dist/katex.min.css";
+
+@theme {
+  /* Cyber colors */
+  --color-cyber-dark: #0f172a;
+  --color-cyber-darker: #020617;
+  --color-cyber-blue: #0ea5e9;
+  --color-cyber-blue-light: #38bdf8;
+  --color-cyber-accent: #06b6d4;
+
+  /* Light mode cyber colors */
+  --color-cyber-light: #f0f9ff;
+  --color-cyber-light-accent: #e0f2fe;
+  --color-cyber-light-border: #7dd3fc;
+}
+
+@variant dark (&:where(.dark, .dark *));
+
+/* Light mode (default) */
+:root {
+  --foreground-rgb: 15, 23, 42;
+  --background-start-rgb: 240, 249, 255;
+  --background-end-rgb: 224, 242, 254;
+}
+
+/* Dark mode */
+.dark {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 15, 23, 42;
+  --background-end-rgb: 2, 6, 23;
+}
+
+html, body {
+  height: 100%;
+  height: 100dvh; /* iOS Safari対応: dynamic viewport height */
+  overflow: hidden;
+  /* iOS Safari でのバウンススクロール防止 */
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* iOS Safari 100vh 問題の修正 */
+@supports (-webkit-touch-callout: none) {
+  html, body {
+    height: -webkit-fill-available;
+  }
+}
+
+/* iPhone ノッチ/セーフエリア対応 */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      135deg,
+      rgb(var(--background-start-rgb)),
+      rgb(var(--background-end-rgb))
+    );
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+@utility text-balance {
+  text-wrap: balance;
+}
+
+/* Custom scrollbar styles */
+/* WebKit browsers (Chrome, Safari, Edge) */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.5);
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.7);
+}
+
+/* Dark mode scrollbar */
+.dark .scrollbar-thin {
+  scrollbar-color: rgba(100, 116, 139, 0.5) transparent;
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.5);
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.7);
+}
+
+/* Code block scrollbar - more subtle */
+.code-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+}
+
+.code-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.code-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 2px;
+  margin: 4px;
+}
+
+.code-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 2px;
+}
+
+.code-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+.code-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Dark mode code scrollbar */
+.dark .code-scrollbar {
+  scrollbar-color: rgba(100, 116, 139, 0.3) transparent;
+}
+
+.dark .code-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.3);
+}
+
+.dark .code-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.5);
+}
+
+/* User message code scrollbar (cyan theme) */
+.code-scrollbar-user {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(165, 243, 252, 0.3) transparent;
+}
+
+.code-scrollbar-user::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.code-scrollbar-user::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 2px;
+  margin: 4px;
+}
+
+.code-scrollbar-user::-webkit-scrollbar-thumb {
+  background: rgba(165, 243, 252, 0.3);
+  border-radius: 2px;
+}
+
+.code-scrollbar-user::-webkit-scrollbar-thumb:hover {
+  background: rgba(165, 243, 252, 0.5);
+}
+
+.code-scrollbar-user::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* KaTeX math styling */
+.katex {
+  font-size: 1em;
+}
+
+/* Dark mode KaTeX */
+.dark .katex {
+  color: inherit;
+}
+
+/* Inline math styling */
+.katex-display {
+  margin: 0.75em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.5em 0;
+}
+
+/* User message math (white text) */
+.prose-invert .katex {
+  color: white;
+}
+
+/* Math scrollbar */
+.katex-display::-webkit-scrollbar {
+  height: 4px;
+}
+
+.katex-display::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.katex-display::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 2px;
+}
+
+.katex-display::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+/* Chat area scrollbar - elegant and minimal */
+.chat-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(6, 182, 212, 0.3) transparent;
+}
+
+.chat-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 4px;
+  margin: 8px 0;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(6, 182, 212, 0.4) 0%,
+    rgba(14, 165, 233, 0.4) 100%
+  );
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(6, 182, 212, 0.6) 0%,
+    rgba(14, 165, 233, 0.6) 100%
+  );
+  background-clip: padding-box;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(
+    180deg,
+    rgba(6, 182, 212, 0.8) 0%,
+    rgba(14, 165, 233, 0.8) 100%
+  );
+  background-clip: padding-box;
+}
+
+/* Dark mode chat scrollbar */
+.dark .chat-scrollbar {
+  scrollbar-color: rgba(34, 211, 238, 0.3) transparent;
+}
+
+.dark .chat-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(34, 211, 238, 0.3) 0%,
+    rgba(56, 189, 248, 0.3) 100%
+  );
+  background-clip: padding-box;
+}
+
+.dark .chat-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(34, 211, 238, 0.5) 0%,
+    rgba(56, 189, 248, 0.5) 100%
+  );
+  background-clip: padding-box;
+}
+
+.dark .chat-scrollbar::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(
+    180deg,
+    rgba(34, 211, 238, 0.7) 0%,
+    rgba(56, 189, 248, 0.7) 100%
+  );
+  background-clip: padding-box;
+}

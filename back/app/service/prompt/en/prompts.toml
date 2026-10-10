@@ -18,7 +18,7 @@ You act as a Manim code generator
 Based on the instructions below, output Python code that is executable in Manim.
 Do not write any unnecessary explanations outside of the code.
 
-Manim version is 0.19.0. The Python execution environment has only manim, numpy, and matplotlib installed.
+Manim version is 0.20.1. The Python execution environment has only manim, numpy, and matplotlib installed.
 Do not use any other libraries.
 Directly using default function or variable names from numpy or matplotlib is risky and should be avoided.
 
@@ -63,7 +63,7 @@ prompt1 = """
 You are an expert in Manim script debugging and modification.
 Based on the following error message, please propose a corrected version of the Manim script.
 You must provide clear instructions explaining what was changed and why in order to fix the script.
-The Manim version is 0.19.0.
+The Manim version is 0.20.1.
 The Python execution environment has only manim, numpy, and matplotlib installed.
 Do not use any other libraries.
 Preserve the original structure and content of the script as much as possible.
@@ -87,7 +87,7 @@ As a Manim expert, do not write any explanations outside of the code.
 
 You must create the scene using from manim import * and class GeneratedScene(Scene):.
 
-The Manim version is 0.19.0.
+The Manim version is 0.20.1.
 
 The Python execution environment has only manim, numpy, and matplotlib installed.
 

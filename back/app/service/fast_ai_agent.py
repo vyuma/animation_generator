@@ -26,6 +26,7 @@ class ManimGraphState(TypedDict):
     current_script: str  # 現在のManimスクリプト (修正対象)
     last_error: str  # 最後に発生したエラーメッセージ (LinterまたはRuntime)
     error_type: Literal["", "lint", "runtime"]  # エラーの種別
+    lint_has_errors: bool  # Qual が severity=error を報告したか（warning のみならレンダリング可能）
     is_bad_request: bool  # 不正リクエストフラグ
 
     # --- 制御用 ---
@@ -142,24 +143,35 @@ class ManimFastAnimationService(BaseManimAgent):
             return await self._generate_initial_script_generate(state)
 
     async def _run_linter_check(self, state: ManimGraphState):
-        self.base_logger.info("--- 2. [Node] Running Manim Linter ---")
-        self._update_job_progress(state, 0.50, JobStep.LINTING, "Running linter check...")
-        # Linterは同期的な処理なのでto_threadでラップ
+        self.base_logger.info("--- 2. [Node] Running Qual (Manim linter) ---")
+        self._update_job_progress(state, 0.50, JobStep.LINTING, "Running Qual linter check...")
+        # Qual は外部プロセスなので to_thread でラップ
         lint_result = await asyncio.to_thread(self._check_code_lint, state["current_script"])
-        status = lint_result.get("status")
-        issue_count = lint_result.get("issue_count", len(lint_result.get("issues", [])))
+        update: dict = {}
 
-        if status == "pass":
-            self.base_logger.debug("   [+] Linter check passed with no warnings.")
-            return {"last_error": "", "error_type": ""}
+        # Qual の自動修正（例: mobject.shift(...) -> mobject.animate.shift(...)）を反映
+        if lint_result.get("fixed_code"):
+            self.base_logger.info("   [+] Applied Qual auto-fixes to the script.")
+            update["current_script"] = lint_result["fixed_code"]
 
-        self.base_logger.warning(f"   [-] Linter detected {issue_count} issue(s). Initiating refinement.")
         for issue in lint_result.get("issues", []):
             self.base_logger.debug(
-                f"      -> {issue.get('filename')}:{issue.get('lineno')} [{issue.get('code')}] {issue.get('message')}"
+                f"      -> line {issue.get('lineno')} [{issue.get('code')} {issue.get('severity')}/"
+                f"{issue.get('confidence')}] {issue.get('message')}"
             )
-        summary = lint_result.get("summary") or ""
-        return {"last_error": summary, "error_type": "lint"}
+
+        if lint_result.get("status") == "pass":
+            self.base_logger.debug("   [+] Qual check passed.")
+            return {**update, "last_error": "", "error_type": "", "lint_has_errors": False}
+
+        issue_count = lint_result.get("issue_count", 0)
+        self.base_logger.warning(f"   [-] Qual detected {issue_count} blocking issue(s). Initiating refinement.")
+        return {
+            **update,
+            "last_error": lint_result.get("summary") or "",
+            "error_type": "lint",
+            "lint_has_errors": bool(lint_result.get("has_errors")),
+        }
 
     async def _check_bad_request(self, state: ManimGraphState):
         self.base_logger.info("--- 3. [Node] Checking for Bad Request ---")
@@ -276,6 +288,10 @@ class ManimFastAnimationService(BaseManimAgent):
         """[Conditional Edge] リンターエラーか、リトライ上限か"""
         if state["error_type"] == "lint":
             if state["current_retry"] >= state["max_retries"]:
+                if not state.get("lint_has_errors", True):
+                    # warning のみ残存: 描画は可能なので実行で最終判定する
+                    self.base_logger.warning("--- [Branch] Max Retries Reached (Lint Warnings only). Proceeding. ---")
+                    return "check_bad_request"
                 self.base_logger.warning("--- [Branch] Max Retries Reached (Lint Error). Ending. ---")
                 return "end_with_error"
             self.base_logger.info("--- [Branch] Linter Failed. Proceeding to Refine. ---")
@@ -365,6 +381,7 @@ class ManimFastAnimationService(BaseManimAgent):
             "current_script": "",
             "last_error": "",
             "error_type": "",
+            "lint_has_errors": False,
             "is_bad_request": False,
             "max_retries": maxloop,
             "current_retry": 0,
@@ -416,6 +433,7 @@ class ManimFastAnimationService(BaseManimAgent):
             "current_script": original_script,
             "last_error": "",
             "error_type": "",
+            "lint_has_errors": False,
             "is_bad_request": False,
             "max_retries": maxloop,
             "current_retry": 0,

@@ -3,3 +3,6 @@ media/
 script/
 prompts/
 tmp/
+.env
+front/node_modules/
+front/.next/
