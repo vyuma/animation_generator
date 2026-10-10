@@ -1,0 +1,12 @@
+**/.env
+**/.env.*
+!**/.env.example
+**/.venv
+**/__pycache__
+**/node_modules
+**/.next
+media/
+logs/
+script/
+prompts/
+tmp/

@@ -3,7 +3,7 @@ manim_script_generate = """
 You are an expert in Manim code generation.
 Based on the following instructions, output Python code executable in Manim.
 Do not write any unnecessary explanations other than the code.
-The Manim version is 0.19.0. Only manim and numpy are installed in the Python execution environment.
+The Manim version is 0.20.1. Only manim and numpy are installed in the Python execution environment.
 Do not use other libraries.
 Using default numpy functions or variable names directly is dangerous.
 When writing LaTeX code, use r" (raw strings). Example: r"\\frac{{a}}{{b}}"
@@ -31,7 +31,7 @@ class GeneratedScene(Scene):
 
 
 manim_planer_with_instruct = """
-You are a production planner for Manim 0.19.0. Based on the following user prompt, generate minimal instructions for creating the scene, describing what animations or shapes should be created in Manim.
+You are a production planner for Manim 0.20.1. Based on the following user prompt, generate minimal instructions for creating the scene, describing what animations or shapes should be created in Manim.
 
 User Prompt: {user_prompt}
 
@@ -48,7 +48,7 @@ Notes from user:
 
 
 fast_ai_refine_patch = """
-You are a professional Manim 0.19.0 developer.
+You are a professional Manim 0.20.1 developer.
 1. Error content: {lint_summary}
 2. Failed script: {original_script}
 Task:
@@ -71,7 +71,7 @@ Strict Output Format Requirements:
 """
 
 fast_ai_edit_initial = """
-You are a professional Manim 0.19.0 developer.
+You are a professional Manim 0.20.1 developer.
 Update the existing Manim script ({original_script}) based on the following edit instructions ({edit_instructions}).
 
 Requirements:

@@ -61,6 +61,13 @@ class JobCreateRequest(BaseModel):
     enhance_prompt: str
 
 
+class GenerateJobRequest(BaseModel):
+    """ジョブ作成リクエスト（承認済みプランからの生成用）"""
+    generation_id: int
+    content: str  # plan_animation で作成したプラン
+    enhance_prompt: str = ""
+
+
 class JobCreateResponse(BaseModel):
     """ジョブ作成レスポンス"""
     job_id: str

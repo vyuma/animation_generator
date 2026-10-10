@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import os
 from typing import Any
 
 from dotenv import load_dotenv
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
 
+from app.service.llm.factory import create_chat_model
 from app.tools.template_data.template_rag_store import TemplateRAGStore
 
 load_dotenv()
@@ -18,22 +18,13 @@ class TemplateService:
     """
 
     def __init__(self) -> None:
-        self.summary_model = "gemini-2.5-flash-lite"
-        self.google_api_key = os.getenv("GEMINI_API_KEY")
-
         self._rag_store = TemplateRAGStore()
-        self._summary_llm: ChatGoogleGenerativeAI | None = None
+        self._summary_llm: BaseChatModel | None = None
 
-    def _ensure_summary_llm(self) -> ChatGoogleGenerativeAI:
-        if not self.google_api_key:
-            raise RuntimeError("GEMINI_API_KEY is not configured.")
+    def _ensure_summary_llm(self) -> BaseChatModel:
+        # LLM_PROVIDER に従って軽量モデル（lite）で要約する
         if self._summary_llm is None:
-            self._summary_llm = ChatGoogleGenerativeAI(
-                model=self.summary_model,
-                google_api_key=self.google_api_key,
-                temperature=0.2,
-                max_output_tokens=180,
-            )
+            self._summary_llm = create_chat_model("lite")
         return self._summary_llm
 
     @staticmethod

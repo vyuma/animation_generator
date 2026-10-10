@@ -13,16 +13,15 @@ from typing import Optional
 
 from dotenv import load_dotenv
 from langchain_core.callbacks import BaseCallbackHandler
-from langchain_anthropic import ChatAnthropic
 from langchain_community.chat_models import ChatOllama
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_openai import ChatOpenAI
+from langchain_core.runnables import Runnable, RunnableLambda
 from langdetect import LangDetectException, detect
 from loguru import logger
 from pydantic import BaseModel
 
+from app.service.llm.factory import Tier, create_chat_model, get_model_name, get_provider
 from app.tools.diff_patcher import DiffPatcher
-from app.tools.manim_linter import ManimLinter
+from app.tools.qual_linter import QualLinter
 from app.tools.secure import is_code_safe
 
 load_dotenv()
@@ -380,10 +379,16 @@ class BaseManimAgent(ABC):
         # トークン追跡機能の初期化（LLM初期化より前に必要）
         self._token_tracker = TokenUsageTracker(self.base_logger)
         # LLMの初期化（コールバック付きで返される）
-        self.pro_llm = self._load_llm("gemini-3-flash-preview") # 本来はGemini-3-pro-previewを使用するがコスト削減のため変更
-        self.flash_llm = self._load_llm("gemini-3-flash-preview")
-        self.lite_llm = self._load_llm("gemini-3-flash-preview")
-        self.manim_linter = ManimLinter()
+        # プロバイダ/モデルは .env の LLM_PROVIDER / LLM_MODEL_* で切り替え（app/service/llm/factory.py）
+        self.llm_provider = get_provider()
+        self.pro_llm = self._load_llm("pro")
+        self.flash_llm = self._load_llm("flash")
+        self.lite_llm = self._load_llm("lite")
+        self.base_logger.info(
+            f"LLM provider: {self.llm_provider} "
+            f"(pro={get_model_name('pro')}, flash={get_model_name('flash')}, lite={get_model_name('lite')})"
+        )
+        self.manim_linter = QualLinter()
 
         # ローカル関数のpath関連
         self.workspace_path = Path(os.getenv("WORKSPACE_PATH"))
@@ -540,29 +545,24 @@ class BaseManimAgent(ABC):
             self.base_logger.warning(f"Prompt [{section}][{key}] not found for '{lang}', trying default")
             return self.prompts[self.DEFAULT_LANGUAGE][section][key]
 
-    def _load_llm(
-        self, model_type: str, *, model_provider: str = "google"
-    ) -> ChatGoogleGenerativeAI | ChatAnthropic | ChatOpenAI:
+    def _load_llm(self, tier: Tier) -> Runnable:
         """
-        APIによって呼び出す場合のLLMはこの関数の中で定義する。
-        例: Google Gemini, Anthropic Claude, OpenAI GPT, xAI grok など
+        用途 (pro / flash / lite) に応じた LLM を生成する。
+        プロバイダ: Google Gemini（デフォルト）, Anthropic Claude API, Claude Code CLI, OpenAI。
 
         トークン追跡コールバックがデフォルトで設定される。
         """
-        llm: ChatGoogleGenerativeAI | ChatAnthropic | ChatOpenAI | None = None
+        try:
+            llm = create_chat_model(tier)
+        except ValueError as e:
+            # API キー未設定でもサーバーは起動させ、生成リクエスト時に分かるエラーを返す
+            self.base_logger.error(f"LLM ({tier}) is not configured: {e}")
+            message = str(e)
 
-        if model_provider == "google":
-            llm = ChatGoogleGenerativeAI(model=model_type, google_api_key=os.getenv("GEMINI_API_KEY"))
-        elif model_provider == "anthropic":
-            # Anthropic ClaudeのAPIキーが設定されている場合
-            if os.getenv("ANTHROPIC_API_KEY"):
-                llm = ChatAnthropic(model=model_type, api_key=os.getenv("ANTHROPIC_API_KEY"))
-        elif model_provider == "openai":
-            llm = ChatOpenAI(model_name=model_type, api_key=os.getenv("OPENAI_API_KEY"))
+            def _raise_not_configured(_input):
+                raise RuntimeError(message)
 
-        if llm is None:
-            raise ValueError("Unsupported model provider")
-
+            return RunnableLambda(_raise_not_configured)
         # トークン追跡コールバックをデフォルトで設定
         callback = TokenTrackingCallbackHandler(self._token_tracker)
         return llm.with_config(callbacks=[callback])
@@ -688,7 +688,7 @@ class BaseManimAgent(ABC):
         return is_code_safe(code)
 
     def _check_code_lint(self, code: str) -> dict:
-        """[Helper] manimコードのリンターチェック"""
+        """[Helper] Qual による Manim コードの静的解析（自動修正込み）"""
         return self.manim_linter.check_code(code)
 
     def _save_subprocess_logs(self, video_id: str, stdout: str, stderr: str) -> None:
